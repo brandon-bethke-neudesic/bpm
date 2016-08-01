@@ -12,7 +12,7 @@ type GitCommands struct {
 }
 
 func (git *GitCommands) GetRemoteUrl(remoteName string) (string, error) {
-    gitCommand := "git remote get-url " + remoteName
+    gitCommand := "git remote -v | grep " + remoteName + ".*fetch | awk '{print $2}'"
     stdOut, stdErr, err := git.RunCommand(git.Path, gitCommand)
     if err != nil {
         return stdErr, err;
