@@ -5,6 +5,8 @@ import (
     "strings"
     "bytes"
     "fmt"
+    "regexp"
+    "errors"
 )
 
 type GitCommands struct {
@@ -12,12 +14,20 @@ type GitCommands struct {
 }
 
 func (git *GitCommands) GetRemoteUrl(remoteName string) (string, error) {
-    gitCommand := "git remote -v | grep " + remoteName + ".*fetch | awk '{print $2}'"
+    gitCommand := "git remote -v"
     stdOut, stdErr, err := git.RunCommand(git.Path, gitCommand)
     if err != nil {
         return stdErr, err;
     }
-    return stdOut, nil;
+    re := regexp.MustCompile(remoteName + "\\s(http.*\\.git)\\s")
+    matched := re.FindAllStringSubmatch(stdOut, -1)
+    if len(matched) == 0 {
+        return "", errors.New("Could not find the remote " + remoteName)
+    }
+    if len(matched[1]) == 0 {
+        return "", errors.New("Could not find the remote " + remoteName)
+    }
+    return matched[1][1], nil;
 }
 
 func (git *GitCommands) GetLatestCommit() (string, error) {
