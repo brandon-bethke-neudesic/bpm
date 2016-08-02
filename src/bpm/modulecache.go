@@ -80,8 +80,11 @@ func (r *ModuleCache) Add(item ModuleCacheItem, resolveVersion bool) (error) {
         } else if versionCompareResult == 0 && strings.Compare(existingItem.Commit, item.Commit) != 0 {
             fmt.Println("Conflict. The version number is the same, but the commit hash is different. Ignoring")
             return nil;
-        } else {
+        } else if versionCompareResult == 1 {
             fmt.Println("The version number is greater and this version of the module will be used.")
+        } else {
+            // The version number is the same...
+            return nil;
         }
     }
     r.Items[item.Name] = item;

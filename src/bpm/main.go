@@ -23,6 +23,7 @@ const localModuleName = "local"
 
 func GetDependenciesLocal(itemName string, itemPath string) error {
     theUrl := path.Join(localPath, itemName);
+    fmt.Println("Processing local dependency in", theUrl)
     os.RemoveAll(itemPath)
     os.MkdirAll(itemPath, 0777)
     copyDir := CopyDir{Exclude:excludeFileList}
@@ -43,7 +44,6 @@ func GetDependenciesLocal(itemName string, itemPath string) error {
         return err
     }
     for depName, _ := range moduleBpm.Dependencies {
-        fmt.Println("Processing dependency", depName)
         depPath := path.Join(bpmCachePath, depName, localModuleName)
         err = GetDependenciesLocal(depName, depPath)
         if err != nil {
@@ -68,6 +68,7 @@ func GetDependencies(itemName string, item BpmDependency) error {
     if item.Commit == "" {
         fmt.Println("Error: No commit specified for " + itemName)
     }
+    fmt.Println("Processing dependency", itemName)
     workingPath,_ := os.Getwd();
     git := GitCommands{Path:workingPath}
 
@@ -136,7 +137,6 @@ func GetDependencies(itemName string, item BpmDependency) error {
     for name, v := range moduleBpm.Dependencies {
         // Do not process a dependency which appears to be itself.
         if strings.Compare(strings.ToLower(name), strings.ToLower(itemName)) != 0 {
-            fmt.Println("Processing dependency", name)
             err := GetDependencies(name, v)
             if err != nil {
                 return err;
@@ -303,7 +303,6 @@ func main() {
                     return
                 }
                 for depName, _ := range moduleBpm.Dependencies {
-                    fmt.Println("Processing dependency", depName)
                     depPath := path.Join(bpmCachePath, depName, localModuleName)
                     GetDependenciesLocal(depName, depPath)
                 }
@@ -389,7 +388,6 @@ func main() {
             cacheItem := ModuleCacheItem{Name:moduleBpm.Name, Version: moduleBpmVersion.String(), Commit: newCommit, Path: itemNewPath}
             moduleCache.Add(cacheItem, true)
             for depName, v := range moduleBpm.Dependencies {
-                fmt.Println("Processing dependency", depName)
                 GetDependencies(depName, v)
             }
             newItem := BpmDependency{Url: depItem.Url, Commit:newCommit}
@@ -542,7 +540,6 @@ func main() {
             moduleCache.Add(cacheItem, true)
         }
         for depName, v := range moduleBpm.Dependencies {
-            fmt.Println("Processing dependency", depName)
             GetDependencies(depName, v)
         }
         err = moduleCache.CopyAndNpmInstall(path.Join(workingPath, "node_modules"))
@@ -610,7 +607,6 @@ func main() {
     fmt.Println("Processing all dependencies for", bpm.Name, "version", bpm.Version);
 
     for depName, v := range bpm.Dependencies {
-        fmt.Println("Processing dependency", depName)
         if useLocal {
             depPath := path.Join(bpmCachePath, depName, localModuleName)
             GetDependenciesLocal(depName, depPath)
