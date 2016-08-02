@@ -12,14 +12,14 @@ import (
     "github.com/blang/semver"
 )
 
-var bpmCachePath = "bpm_modules"
-var bpmFileName = "bpm.json"
+const bpmCachePath = "bpm_modules"
+const bpmFileName = "bpm.json"
 var useRemote = ""
 var useLocal = false
 var localPath = ""
 var moduleCache = ModuleCache{Items:make(map[string]ModuleCacheItem)};
-var excludeFileList = ".git|.gitignore|.gitmodules|" + bpmCachePath
-var localModuleName = "local"
+const excludeFileList = ".git|.gitignore|.gitmodules|" + bpmCachePath
+const localModuleName = "local"
 
 func GetDependenciesLocal(itemName string, itemPath string) error {
     theUrl := path.Join(localPath, itemName);
