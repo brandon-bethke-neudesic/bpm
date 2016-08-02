@@ -12,7 +12,6 @@ type ModuleCacheItem struct {
     Name string
     Version string
     Commit string
-    Url string
     Path string
 }
 
