@@ -170,9 +170,9 @@ func main() {
             return;
         }
 
-        if strings.Compare(strings.ToLower(arg), "clean") == 0 {
+        if strings.Compare(strings.ToLower(arg), "--clean") == 0 {
             os.RemoveAll(bpmCachePath);
-            os.Exit(0)
+            os.Exit(1)
         }
 
         if strings.Compare(strings.ToLower(arg), "install") == 0 {
