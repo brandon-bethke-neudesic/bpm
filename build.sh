@@ -1,4 +1,5 @@
 #!/bin/bash
+export GOPATH=`pwd`
 go get bpm
 go install bpm
 if [ -f /usr/local/bin/bpm ]; then
