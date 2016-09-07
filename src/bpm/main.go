@@ -76,11 +76,13 @@ func GetDependencies(itemName string, item BpmDependency) error {
     os.Mkdir(itemPath, 0777)
 
     itemClonePath := path.Join(workingPath, itemPath, item.Commit)
+    fmt.Println("DEBUG: itemClonePath " + itemClonePath)
     localPath := path.Join(bpmCachePath, itemName, localModuleName)
     if PathExists(localPath) {
         fmt.Println("Found local folder in the bpm modules. Using this folder", localPath)
         itemClonePath = localPath;
     } else if !PathExists(itemClonePath) {
+        fmt.Println("DEBUG: PATH does not exist: " + itemClonePath)
         theUrl, err := git.GetRemoteUrl(useRemote)
         if err != nil {
             fmt.Println("Error: There was a problem getting the remote url", useRemote)
@@ -314,6 +316,7 @@ func main() {
             }
 
             git := GitCommands{Path:workingPath}
+            fmt.Println("DEBUG: here")
             theUrl, err := git.GetRemoteUrl(useRemote)
             if err != nil {
                 fmt.Println("There was a problem getting the remote url", useRemote)
@@ -434,6 +437,7 @@ func main() {
         }
 
         git := GitCommands{Path:workingPath}
+        fmt.Println("DEBUG: here1")
         tmpUrl, err := git.GetRemoteUrl(useRemote);
         if err != nil {
             fmt.Println("Error: There was a problem getting the remote url", useRemote)
@@ -572,7 +576,7 @@ func main() {
     }
 
     if _, err := os.Stat(bpmFileName); os.IsNotExist(err) {
-        fmt.Print(bpmFileName, "Error: The bpm file does not exist in the current directory.");
+        fmt.Println(bpmFileName, "Error: The bpm file does not exist in the current directory.");
         os.Exit(1);
     }
 
