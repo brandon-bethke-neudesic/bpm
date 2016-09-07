@@ -24,6 +24,24 @@ func (r *ModuleCache) Delete(item string) {
     return
 }
 
+func (r *ModuleCache) NpmInstall(nodeModulesPath string) (error){
+    fmt.Println("Installing to node_modules...")
+    // Go through each item in the bpm memory cache. There is suppose to only be one item per dependency
+    for depName := range r.Items {
+        fmt.Println("Processing cached dependency", depName)
+        depItem := r.Items[depName];
+
+        // Perform the npm install and pass the url of the dependency. npm install ./node_modules/mydep
+        npm := NpmCommands{Path: path.Join(nodeModulesPath, "..")}
+        err := npm.InstallUrl(depItem.Path)
+        if err != nil {
+            fmt.Println("Error: Failed to npm install module", depName)
+            return err;
+        }
+
+    }
+    return nil;
+}
 
 func (r *ModuleCache) CopyAndNpmInstall(nodeModulesPath string) (error){
     fmt.Println("Copying dependencies to the node_modules folder")

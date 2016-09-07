@@ -308,7 +308,8 @@ func main() {
                     depPath := path.Join(bpmCachePath, depName, localModuleName)
                     GetDependenciesLocal(depName, depPath)
                 }
-                err = moduleCache.CopyAndNpmInstall(path.Join(workingPath, "node_modules"))
+                err = moduleCache.NpmInstall(path.Join(workingPath, "node_modules"))
+                //err = moduleCache.CopyAndNpmInstall(path.Join(workingPath, "node_modules"))
                 if err != nil {
                     os.Exit(1)
                 }
@@ -396,7 +397,8 @@ func main() {
             newItem := BpmDependency{Url: depItem.Url, Commit:newCommit}
             bpm.Dependencies[updateModule] = newItem;
         }
-        err = moduleCache.CopyAndNpmInstall(path.Join(workingPath, "node_modules"))
+        err = moduleCache.NpmInstall(path.Join(workingPath, "node_modules"))
+        //err = moduleCache.CopyAndNpmInstall(path.Join(workingPath, "node_modules"))
         if err != nil {
             os.Exit(1)
         }
@@ -546,7 +548,8 @@ func main() {
         for depName, v := range moduleBpm.Dependencies {
             GetDependencies(depName, v)
         }
-        err = moduleCache.CopyAndNpmInstall(path.Join(workingPath, "node_modules"))
+        err = moduleCache.NpmInstall(path.Join(workingPath, "node_modules"))
+        //err = moduleCache.CopyAndNpmInstall(path.Join(workingPath, "node_modules"))
         if err != nil {
             os.Exit(1)
         }
@@ -623,7 +626,8 @@ func main() {
             }
         }
     }
-    err = moduleCache.CopyAndNpmInstall(path.Join(workingPath, "node_modules"))
+    err = moduleCache.NpmInstall(path.Join(workingPath, "node_modules"))
+    //err = moduleCache.CopyAndNpmInstall(path.Join(workingPath, "node_modules"))
     if err != nil {
         os.Exit(1)
     }
