@@ -3,6 +3,8 @@ package main;
 import (
     "io/ioutil"
     "encoding/json"
+    "github.com/blang/semver"
+    "fmt"
 )
 /*
 {
@@ -26,14 +28,58 @@ type BpmDependency struct {
     Url    string `json:"url"`
 }
 
+func (dep *BpmDependency) Equal(item BpmDependency) bool {
+    if item.Commit == dep.Commit && item.Url == dep.Url {
+        return true;
+    }
+    return false;
+}
+
 type BpmData struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
     Dependencies map[string]BpmDependency `json:"dependencies"`
 }
 
+func (bpm *BpmData) IncrementVersion() (error){
+    bpmVersion, err := semver.Make(bpm.Version);
+    if err != nil {
+        fmt.Println("Error: Could not read the version field from the bpm file");
+        return err;
+    }
+    bpmVersion.Patch++;
+    bpm.Version = bpmVersion.String();
+    return nil;
+}
+
 func (bpm *BpmData) HasDependencies() bool {
     return len(bpm.Dependencies) > 0
+}
+
+func (bpm *BpmData) String() string {
+    bytes, err := json.MarshalIndent(bpm, "", "   ")
+    if err != nil {
+        fmt.Println(err)
+        return "";
+    }
+
+    return string(bytes);
+}
+
+func (bpm *BpmData) WriteFile(file string) error {
+    bytes, err := json.MarshalIndent(bpm, "", "   ")
+    if err != nil {
+        fmt.Println(err)
+        return err;
+    }
+
+    err = ioutil.WriteFile(file, bytes, 0666);
+    if err != nil {
+        fmt.Println("Error: There was an issue writing the file", file)
+        fmt.Println(err)
+        return err;
+    }
+    return nil;
 }
 
 func (bpm *BpmData) LoadFile(file string) error {

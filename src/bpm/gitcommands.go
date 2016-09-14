@@ -13,6 +13,29 @@ type GitCommands struct {
     Path string
 }
 
+// If commitB is printed, then commitA is an ancestor of commit B
+//"git rev-list <commitA> | grep $(git rev-parse <commitB>)"
+
+func (git *GitCommands) DetermineAncestor(commit1 string, commit2 string) string {
+    stdOut, _, err := git.RunCommand(git.Path, "git rev-list " + commit1)
+    if err != nil {
+        return "";
+    }
+    if !strings.Contains(stdOut, commit2) {
+        stdOut, _, err = git.RunCommand(git.Path, "git rev-list " + commit2)
+        if err != nil {
+            return "";
+        }
+        if !strings.Contains(stdOut, commit1) {
+            return ""
+        } else {
+            return commit2
+        }
+    } else {
+        return commit1
+    }
+}
+
 func (git *GitCommands) GetRemoteUrl(remoteName string) (string, error) {
     gitCommand := "git remote -v"
     stdOut, stdErr, err := git.RunCommand(git.Path, gitCommand)
@@ -38,12 +61,6 @@ func (git *GitCommands) GetLatestCommit() (string, error) {
     }
     return stdOut, nil;
 }
-
-
-// git init
-// git remote add origin http://blah
-// git fetch origin
-// git checkout 709c0b4b817b136c63c1896c6af10eb5962005bd
 
 func (git *GitCommands) RunCommand(dir string, command string) (string, string, error) {
     cmd := exec.Command("git")

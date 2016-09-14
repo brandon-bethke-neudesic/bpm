@@ -5,7 +5,7 @@ How to build the bpm
 ./build.sh
 
 This script will create a symbolic link for bpm in the /usr/local/bin folder.
-
+It also creates the linux and darwin version of the app.
 
 Overview of the bpm.json file structure.
 
@@ -20,11 +20,11 @@ Overview of the bpm.json file structure.
         }
     }
 
-name: The name of the component
+name: The name of the component. Generally this is the same name as the git repo.
 
-version: The version number of the component. This is used to resolve conflicts that may arise when computing the dependency tree.
+version: The version number of the component. Versioning is used to resolve conflicts that may arise when computing the dependency tree.
 
-dependencies: A map of the dependencies where the map key is the name of the dependency
+dependencies: A map of the dependencies. The map key is the name of the dependency
 
 dependency map item
 
@@ -32,15 +32,16 @@ url: The full or relative URL to the repository
 
 commit: The commit hash
 
-Build the bpm dependencies specified in bpm.json. bpm depends on git and therefore must be installed. The repository where the bpm command is run must be a git repository with at least a remote of origin.
+Install dependencies
+Dependencies specified in the bpm.json are installed using the `bpm install` command. bpm requires git and the repository where the bpm command is run must be a git repository with at least a remote of origin.
 
-    bpm [--remote=origin] | [--root=.]
+    bpm install [--remote=myremote] | [--root=mypath]
 
 Example:
 
-    bpm
-    bpm --root=../js
-    bpm --remote=brandon
+    bpm install
+    bpm install --root=../js
+    bpm install --remote=brandon
 
 For example, given the following bpm.json for the repository my-component
 
@@ -60,26 +61,23 @@ The bpm command will:
 - create a directory in the bpm_modules folder for my-component
 - git fetch the repository at the specified URL
 - git checkout the specified commit hash in a subfolder
-- copy the subfolder to the node_modules folder as my-component
-- run npm install on my-component
+- run npm install on my-component/hash at which point npm will manage dependencies.
 
-In this example the URL is a relative URL. Dependency URLs can be a full URL or a relative URL. For any dependency that has a relative url, the remote option will be used to resolve the relative url to a full url. origin is the default remote. Therefore, if the origin is http://github.com/user/my-component.git, then the dependency url will be resolved to http://github.com/user/my-depencency-1.git
+In this example, the URL is relative. Dependency URLs can be a full URL or a relative URL. For any dependency that has a relative url, the `--remote` option will be used to resolve the relative url to a full url. origin is the default remote. Therefore, if the origin is http://github.com/user/my-component.git, then the dependency url will be resolved to http://github.com/user/my-depencency-1.git
 
-The dependency url and commit are required fields unless the --root option is used.
+The dependency url and commit are required to correctly install a dependency.
 
 When the --root option is used, instead of downloading the code from the dependency url, bpm will attempt to locate the dependency on the local disk relative to the specified root.
 Given the command
-    bpm --root=../mydependencies
+    bpm install --root=../mydependencies
 
 bpm will expect the following folder structure on disk and ignore the specified url and commit hash for each dependency.
 
     mycomponent\
     mydependencies\
-        my-depencency-1\
+        my-dependency-1\
 
-
-The version number is used to resolve conflicts when the dependency tree contains the same dependency but with different commit hashes.
-
+Install a new dependency.
 Install a new dependency and save to the bpm.json. The repository being installed must contain a bpm.json file
 The url parameter can be a relative URL or a full URL. The relative URL will be relative to the specified remote or origin by default
 
@@ -96,28 +94,33 @@ The version number in the bpm.json will be incremented automatically when the in
 
 Update the commit of existing dependency to the latest
 
-    bpm update [dependencyName] [--remote=origin]
+    bpm update [dependencyName] [--remote=myremote | --root=mypath] [--recursive]
 
 Example:
 
     bpm update mortar
     bpm update mortar --remote=brandon
+    bpm update mortar --root=../mydependencies
+    bpm update mortar --root=../mydependencies --recursive
 
+The version number in the bpm.json will be incremented automatically when a dependency has changed.
 
-The version number in the bpm.json will be incremented automatically when the update command is used.
+When using the `--root` option, even though uncommited local changes are always copied to the bpm_modules, it is expected that local changes are committed locally since the dependency is updated to the latest commit hash.
+
+The --recursive option only works when specified with the --root option. bpm will recursively go through all dependencies and update the commit hashes based on the last local commit hash for the dependency. The version number of sub-dependencies are also incremented.
 
 
 Create a default bpm.json
 
-    bpm --new=module
+    bpm init <modulename>
 
 Example:
 
-    bpm --new=my-component
+    bpm init my-component
 
 Clean the bpm_modules
 
-    bpm --clean
+    bpm clean
 
 Sample bpm.json files for repositories login-client, mortar and null-query
 
@@ -200,9 +203,9 @@ When the bpm command is run any existing items in the bpm_module cache will be u
 bmp update module-name [--root=xxx] // get latest of module, put in node_modules, update json with commit, increment version number of json file, if root is specified look in file path root/module-name, update each sub dep in node_modules with --root logic
 
 
-Version resolution
+Dependency conflict resolution.
 
-It is possible that the dependency tree will contain multiple reference to the same dependency. It is also possible that commit hash for those dependencies will be different. In this case, the version number of the dependency in the dependency's bpm.json file will be compared and the latest version will be used.
+It is possible that the dependency tree will contain multiple reference to the same dependency. It is also possible that the commit hash for those dependencies will be different. In this case, the version number of the dependency in the dependency's bpm.json file will be compared and the latest version will be used.
 
 Example:
 
@@ -210,3 +213,7 @@ Example:
 - my-component has dependency-1 and dependency-1 also contains dependency-2 but with commit Y, and dependency-2's bpm.json file for commit Y is version 1.0.1
 
 In this case, version 1.0.1 of dependency-2 will be used.
+
+Using the --resolution option, it is possible to specify an alternative conflict resolution strategy.
+
+The option `--resolution=revisionlist` will attempt to determine which commit is the latest commit using the git revision history.
