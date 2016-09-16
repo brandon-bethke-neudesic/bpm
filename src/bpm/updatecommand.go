@@ -20,7 +20,6 @@ func (cmd *UpdateCommand) Execute() (error) {
     cmd.GitRemote = GetRemote(os.Args);
     cmd.LocalPath = GetLocal(os.Args);
 
-    bpmUpdated := false;
     bpmModuleName := ""
     index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "update" });
     if len(os.Args) > index + 1 && strings.Index(os.Args[index + 1], "--") != 0 {
@@ -96,10 +95,6 @@ func (cmd *UpdateCommand) Execute() (error) {
             GetDependenciesLocal(moduleBpm)
 
             newItem := BpmDependency{Url: depItem.Url, Commit:newCommit}
-            existingItem := bpm.Dependencies[updateModule];
-            if !existingItem.Equal(newItem) {
-                bpmUpdated = true;
-            }
             bpm.Dependencies[updateModule] = newItem;
 
         } else {
@@ -175,13 +170,9 @@ func (cmd *UpdateCommand) Execute() (error) {
             moduleCache.Add(cacheItem, false, "")
             os.RemoveAll(itemPath);
             for depName, v := range moduleBpm.Dependencies {
-                GetDependencies(depName, v)
+                GetDependencies(depName, v, itemRemoteUrl)
             }
             newItem := BpmDependency{Url: depItem.Url, Commit:newCommit}
-            existingItem := bpm.Dependencies[updateModule];
-            if !existingItem.Equal(newItem) {
-                bpmUpdated = true;
-            }
             bpm.Dependencies[updateModule] = newItem;
         }
     }
@@ -192,9 +183,7 @@ func (cmd *UpdateCommand) Execute() (error) {
         return err;
     }
 
-    if bpmUpdated {
-        bpm.IncrementVersion();
-        bpm.WriteFile(path.Join(workingPath, Options.BpmFileName));
-    }
+    bpm.IncrementVersion();
+    bpm.WriteFile(path.Join(workingPath, Options.BpmFileName));
     return nil;
 }

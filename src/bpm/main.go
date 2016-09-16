@@ -95,7 +95,7 @@ func PathExists(path string) (bool) {
     return true
 }
 
-func GetDependencies(itemName string, item BpmDependency) error {
+func GetDependencies(itemName string, item BpmDependency, parentUrl string) error {
     if item.Url == "" {
         fmt.Println("Error: No url specified for " + itemName)
     }
@@ -109,6 +109,7 @@ func GetDependencies(itemName string, item BpmDependency) error {
     itemPath := path.Join(Options.BpmCachePath, itemName)
     os.Mkdir(itemPath, 0777)
 
+    itemRemoteUrl := item.Url;
     itemClonePath := path.Join(workingPath, itemPath, item.Commit)
     localPath := path.Join(Options.BpmCachePath, itemName, Options.LocalModuleName)
     if PathExists(localPath) {
@@ -116,21 +117,37 @@ func GetDependencies(itemName string, item BpmDependency) error {
         itemClonePath = localPath;
     } else if !PathExists(itemClonePath) {
         fmt.Println("Could not find module", itemName, "in the bpm cache. Cloning repository...")
-        theUrl, err := git.GetRemoteUrl(Options.UseRemote)
-        if err != nil {
-            fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
-            return err
+        // If the parent URL is unspecified then use the remote URL as parent.
+        if parentUrl == "" {
+            tempUrl, err := git.GetRemoteUrl(Options.UseRemote)
+            if err != nil {
+                fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
+                return err
+            }
+            parentUrl = tempUrl
+        } else if strings.Index(parentUrl, "http") != 0 {
+            tempUrl, err := git.GetRemoteUrl(Options.UseRemote)
+            if err != nil {
+                fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
+                return err
+            }
+            parsedTmpUrl, err := url.Parse(tempUrl)
+            if err != nil {
+                fmt.Println(err);
+                return err
+            }
+            parentUrl = parsedTmpUrl.Scheme + "://" + path.Join(parsedTmpUrl.Host, parsedTmpUrl.Path, parentUrl)
         }
-        remoteUrl, err := url.Parse(theUrl)
+
+        tempUrl, err := url.Parse(parentUrl)
         if err != nil {
             fmt.Println(err);
             return err
         }
-        itemRemoteUrl := item.Url;
+        // If the item URL is a relative URL, then make a full URL using the parent url as the root.
         if strings.Index(item.Url, "http") != 0 {
-            itemRemoteUrl = remoteUrl.Scheme + "://" + path.Join(remoteUrl.Host, remoteUrl.Path, item.Url)
+            itemRemoteUrl = tempUrl.Scheme + "://" + path.Join(tempUrl.Host, tempUrl.Path, item.Url)
         }
-
         os.Mkdir(itemClonePath, 0777)
         git := GitCommands{Path: itemClonePath}
         err = git.InitAndCheckoutCommit(itemRemoteUrl, item.Commit)
@@ -172,7 +189,7 @@ func GetDependencies(itemName string, item BpmDependency) error {
     for name, v := range moduleBpm.Dependencies {
         // Do not process a dependency which appears to be itself.
         if strings.Compare(strings.ToLower(name), strings.ToLower(itemName)) != 0 {
-            err := GetDependencies(name, v)
+            err := GetDependencies(name, v, itemRemoteUrl)
             if err != nil {
                 return err;
             }

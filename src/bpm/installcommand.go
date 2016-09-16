@@ -47,7 +47,6 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
     if strings.Index(moduleUrl, "http") != 0 {
         itemRemoteUrl = remoteUrl.Scheme + "://" + path.Join(remoteUrl.Host, remoteUrl.Path, moduleUrl)
     }
-
     moduleBpm := BpmData{};
 
     if len(strings.TrimSpace(moduleCommit)) == 0 {
@@ -136,7 +135,7 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         os.RemoveAll(path.Join(itemPath, ".."))
     }
     for depName, v := range moduleBpm.Dependencies {
-        GetDependencies(depName, v)
+        GetDependencies(depName, v, itemRemoteUrl)
     }
     moduleCache.Trim();
     err = moduleCache.NpmInstall()
@@ -191,7 +190,7 @@ func (cmd *InstallCommand) build() (error) {
         GetDependenciesLocal(bpm)
     } else {
         for depName, v := range bpm.Dependencies {
-            err := GetDependencies(depName, v)
+            err := GetDependencies(depName, v, "")
             if err != nil {
                 fmt.Println("Error: There was an issue processing dependency", depName)
                 fmt.Println(err)
