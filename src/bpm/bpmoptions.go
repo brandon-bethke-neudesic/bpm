@@ -15,10 +15,19 @@ type BpmOptions struct {
     BpmFileName string
     LocalModuleName string
     ExcludeFileList string
+    SkipNpmInstall bool
+}
+
+func GetSkipNpmInstall(args []string) bool {
+    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--skipnpm") == 0 });
+    if index == -1 {
+        return false;
+    }
+    return true;
 }
 
 
-func GetRecusiveFlag(args []string) bool {
+func GetRecursiveFlag(args []string) bool {
     index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--recursive") == 0 });
     if index == -1 {
         return false;

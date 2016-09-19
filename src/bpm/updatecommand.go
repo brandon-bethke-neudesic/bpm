@@ -177,12 +177,13 @@ func (cmd *UpdateCommand) Execute() (error) {
         }
     }
     moduleCache.Trim();
-    err = moduleCache.NpmInstall()
-    if err != nil {
-        fmt.Println("Error: There was an issue performing npm install on the dependencies")
-        return err;
+    if !Options.SkipNpmInstall {
+        err = moduleCache.NpmInstall()
+        if err != nil {
+            fmt.Println("Error: There was an issue performing npm install on the dependencies")
+            return err;
+        }
     }
-
     bpm.IncrementVersion();
     bpm.WriteFile(path.Join(workingPath, Options.BpmFileName));
     return nil;

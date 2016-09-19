@@ -138,10 +138,14 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         GetDependencies(depName, v, itemRemoteUrl)
     }
     moduleCache.Trim();
-    err = moduleCache.NpmInstall()
-    if err != nil {
-        return err;
+
+    if !Options.SkipNpmInstall{
+        err = moduleCache.NpmInstall()
+        if err != nil {
+            return err;
+        }
     }
+
     newItem := BpmDependency{Url:moduleUrl, Commit:moduleCommit};
     bpm.Dependencies[moduleBpm.Name] = newItem;
 
@@ -199,9 +203,11 @@ func (cmd *InstallCommand) build() (error) {
         }
     }
     moduleCache.Trim();
-    err = moduleCache.NpmInstall()
-    if err != nil {
-        return err;
+    if !Options.SkipNpmInstall {
+        err = moduleCache.NpmInstall()
+        if err != nil {
+            return err;
+        }
     }
     return nil;
 }

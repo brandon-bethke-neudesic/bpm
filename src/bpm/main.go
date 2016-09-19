@@ -232,9 +232,10 @@ func GetSubCommand() (SubCommand){
 func main() {
     workingPath,_ = os.Getwd();
 
-    Options.Recursive = GetRecusiveFlag(os.Args);
+    Options.Recursive = GetRecursiveFlag(os.Args);
     Options.UseRemote = GetRemote(os.Args);
     Options.UseLocal = GetLocal(os.Args);
+    Options.SkipNpmInstall = GetSkipNpmInstall(os.Args);
     Options.ConflictResolutionType = GetConflictResolutionType(os.Args)
     cmd := GetSubCommand();
     err := cmd.Execute();
