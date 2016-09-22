@@ -92,5 +92,10 @@ func (help *HelpCommand) Execute() (error){
     fmt.Println("")
     fmt.Println("        bpm help");
     fmt.Println("");
+    fmt.Println("");
+    fmt.Println("    --skipnpm");
+    fmt.Println("");
+    fmt.Println("        This flag will cause bpm to skip the npm install phase")
+    fmt.Println("");
     return nil;
 }

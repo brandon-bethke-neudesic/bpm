@@ -217,3 +217,5 @@ In this case, version 1.0.1 of dependency-2 will be used.
 Using the --resolution option, it is possible to specify an alternative conflict resolution strategy.
 
 The option `--resolution=revisionlist` will attempt to determine which commit is the latest commit using the git revision history.
+
+The option `--skipnpm` will skip the npm install phase.

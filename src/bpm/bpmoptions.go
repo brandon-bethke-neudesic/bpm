@@ -16,6 +16,7 @@ type BpmOptions struct {
     LocalModuleName string
     ExcludeFileList string
     SkipNpmInstall bool
+    Command string
 }
 
 func GetSkipNpmInstall(args []string) bool {

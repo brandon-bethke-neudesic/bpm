@@ -31,20 +31,20 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         }
     }
 
-    git := GitCommands{Path:workingPath}
-    tmpUrl, err := git.GetRemoteUrl(cmd.GitRemote);
-    if err != nil {
-        fmt.Println("Error: There was a problem getting the remote url", cmd.GitRemote)
-        return err;
-    }
-
-    remoteUrl, err := url.Parse(tmpUrl)
-    if err != nil {
-        fmt.Println(err);
-        return err;
-    }
     itemRemoteUrl := moduleUrl;
     if strings.Index(moduleUrl, "http") != 0 {
+        git := GitCommands{Path:workingPath}
+        tmpUrl, err := git.GetRemoteUrl(cmd.GitRemote);
+        if err != nil {
+            fmt.Println("Error: There was a problem getting the remote url", cmd.GitRemote)
+            return err;
+        }
+
+        remoteUrl, err := url.Parse(tmpUrl)
+        if err != nil {
+            fmt.Println(err);
+            return err;
+        }
         itemRemoteUrl = remoteUrl.Scheme + "://" + path.Join(remoteUrl.Host, remoteUrl.Path, moduleUrl)
     }
     moduleBpm := BpmData{};
@@ -53,8 +53,8 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         itemPath := path.Join(Options.BpmCachePath, "xx_temp_xx", "xx_temp_xx")
         os.RemoveAll(path.Join(itemPath, ".."));
         os.MkdirAll(itemPath, 0777)
-        git = GitCommands{Path:itemPath}
-        err = git.InitAndFetch(itemRemoteUrl)
+        git := GitCommands{Path:itemPath}
+        err := git.InitAndFetch(itemRemoteUrl)
         if err != nil {
             fmt.Println(err)
             return err;
@@ -100,8 +100,8 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         itemClonePath := path.Join(workingPath, itemPath, moduleCommit)
         os.RemoveAll(path.Join(itemClonePath, ".."));
         os.MkdirAll(itemClonePath, 0777)
-        git = GitCommands{Path:itemClonePath}
-        err = git.InitAndCheckoutCommit(itemRemoteUrl, moduleCommit)
+        git := GitCommands{Path:itemClonePath}
+        err := git.InitAndCheckoutCommit(itemRemoteUrl, moduleCommit)
         if err != nil {
             fmt.Println("Error: There was an issue initializing the repository for dependency", moduleBpm.Name)
             os.RemoveAll(itemClonePath)
@@ -134,13 +134,11 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         moduleCache.Add(cacheItem, true, itemPath)
         os.RemoveAll(path.Join(itemPath, ".."))
     }
-    for depName, v := range moduleBpm.Dependencies {
-        GetDependencies(depName, v, itemRemoteUrl)
-    }
+    GetDependencies(moduleBpm, itemRemoteUrl)
     moduleCache.Trim();
 
     if !Options.SkipNpmInstall{
-        err = moduleCache.NpmInstall()
+        err := moduleCache.NpmInstall()
         if err != nil {
             return err;
         }
@@ -190,18 +188,7 @@ func (cmd *InstallCommand) build() (error) {
     }
 
     fmt.Println("Processing all dependencies for", bpm.Name, "version", bpm.Version);
-    if cmd.LocalPath != "" {
-        GetDependenciesLocal(bpm)
-    } else {
-        for depName, v := range bpm.Dependencies {
-            err := GetDependencies(depName, v, "")
-            if err != nil {
-                fmt.Println("Error: There was an issue processing dependency", depName)
-                fmt.Println(err)
-                return err;
-            }
-        }
-    }
+    GetDependencies(bpm, "")
     moduleCache.Trim();
     if !Options.SkipNpmInstall {
         err = moduleCache.NpmInstall()
