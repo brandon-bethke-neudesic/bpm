@@ -92,8 +92,8 @@ func PrintDependencies(bpm BpmData, indentLevel int) {
 }
 
 func (cmd *LsCommand) Execute() (error) {
-    cmd.GitRemote = GetRemote(os.Args);
-    cmd.LocalPath = GetLocal(os.Args);
+    cmd.GitRemote = Options.UseRemote;
+    cmd.LocalPath = Options.UseLocal;
     if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
         fmt.Println("Error: The bpm.json file does not exist.")
         return err;

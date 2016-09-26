@@ -7,6 +7,7 @@ import (
     "path"
     "net/url"
     "github.com/blang/semver"
+    "errors"
 )
 
 
@@ -153,7 +154,7 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
     return nil;
 }
 
-func (cmd *InstallCommand) build() (error) {
+func (cmd *InstallCommand) build(installItem string) (error) {
     if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
         fmt.Println(Options.BpmFileName, "Error: The bpm file does not exist in the current directory.");
         return err;
@@ -187,8 +188,28 @@ func (cmd *InstallCommand) build() (error) {
         return err;
     }
 
+    newBpm := BpmData{};
+    newBpm.Name = bpm.Name;
+    newBpm.Version = bpm.Version;
+    newBpm.Dependencies = make(map[string]BpmDependency);
+
+    if installItem == "" {
+        for name, v := range bpm.Dependencies {
+            newBpm.Dependencies[name] = v
+        }
+    } else {
+        depItem, exists := bpm.Dependencies[installItem];
+        if !exists {
+            msg := "Error: Could not find module " + installItem + " in the dependencies";
+            fmt.Println(msg)
+            return errors.New(msg)
+        }
+        newBpm.Dependencies[installItem] = depItem;
+    }
+
+
     fmt.Println("Processing all dependencies for", bpm.Name, "version", bpm.Version);
-    GetDependencies(bpm, "")
+    GetDependencies(newBpm, "")
     moduleCache.Trim();
     if !Options.SkipNpmInstall {
         err = moduleCache.NpmInstall()
@@ -200,18 +221,21 @@ func (cmd *InstallCommand) build() (error) {
 }
 
 func (cmd *InstallCommand) Execute() (error) {
-    cmd.GitRemote = GetRemote(os.Args);
-    cmd.LocalPath = GetLocal(os.Args);
+    cmd.GitRemote = Options.UseRemote;
+    cmd.LocalPath = Options.UseLocal;
     index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "install" });
+    newCommit := ""
+    installItem := "";
     if len(os.Args) > index + 1 && strings.Index(os.Args[index + 1], "--") != 0 {
-        newUrl := os.Args[index + 1];
-        newCommit := ""
-        if len(os.Args) > index + 2 && strings.Index(os.Args[index + 2], "--") != 0 {
-            newCommit = os.Args[index + 2];
-        }
-        return cmd.installNew(newUrl, newCommit);
-    } else {
-        return cmd.build();
+        installItem = os.Args[index + 1];
     }
-    return nil;
+
+    if len(os.Args) > index + 2 && strings.Index(os.Args[index + 2], "--") != 0 {
+        newCommit = os.Args[index + 2];
+    }
+
+    if installItem != "" && newCommit != "" {
+        return cmd.installNew(installItem, newCommit);
+    }
+    return cmd.build(installItem);
 }

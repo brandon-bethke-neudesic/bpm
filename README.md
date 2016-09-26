@@ -77,6 +77,14 @@ bpm will expect the following folder structure on disk and ignore the specified 
     mydependencies\
         my-dependency-1\
 
+Install a single existing dependency.
+
+    bpm install [name]
+
+Example:
+
+    bpm install my-dependency-1
+
 Install a new dependency.
 Install a new dependency and save to the bpm.json. The repository being installed must contain a bpm.json file
 The url parameter can be a relative URL or a full URL. The relative URL will be relative to the specified remote or origin by default

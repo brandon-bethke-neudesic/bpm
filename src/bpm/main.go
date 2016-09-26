@@ -219,12 +219,7 @@ func GetSubCommand() (SubCommand){
 
 func main() {
     workingPath,_ = os.Getwd();
-
-    Options.Recursive = GetRecursiveFlag(os.Args);
-    Options.UseRemote = GetRemote(os.Args);
-    Options.UseLocal = GetLocal(os.Args);
-    Options.SkipNpmInstall = GetSkipNpmInstall(os.Args);
-    Options.ConflictResolutionType = GetConflictResolutionType(os.Args)
+    Options.ParseOptions(os.Args);
     cmd := GetSubCommand();
     err := cmd.Execute();
     if err != nil {

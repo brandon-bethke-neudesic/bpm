@@ -24,6 +24,9 @@ func (help *HelpCommand) Execute() (error){
     fmt.Println("        # install all the dependencies in the bpm.json file using the remote origin as the root path if necessary")
     fmt.Println("        bpm install");
     fmt.Println("");
+    fmt.Println("        # install a single existing dependency")
+    fmt.Println("        bpm install mortar")
+    fmt.Println("");
     fmt.Println("        # install and save the mortar dependency using the remote origin as root path and the latest commit.")
     fmt.Println("        bpm install ../mortar.git");
     fmt.Println("");
@@ -97,5 +100,10 @@ func (help *HelpCommand) Execute() (error){
     fmt.Println("");
     fmt.Println("        This flag will cause bpm to skip the npm install phase")
     fmt.Println("");
+    fmt.Println("        Examples:")
+    fmt.Println("")
+    fmt.Println("        bpm install --skipnpm")
+    fmt.Println("        bpm update --skipnpm")
+    fmt.Println("")
     return nil;
 }

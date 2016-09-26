@@ -17,8 +17,8 @@ type UpdateCommand struct {
 }
 
 func (cmd *UpdateCommand) Execute() (error) {
-    cmd.GitRemote = GetRemote(os.Args);
-    cmd.LocalPath = GetLocal(os.Args);
+    cmd.GitRemote = Options.UseRemote;
+    cmd.LocalPath = Options.UseLocal;
 
     bpmModuleName := ""
     index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "update" });

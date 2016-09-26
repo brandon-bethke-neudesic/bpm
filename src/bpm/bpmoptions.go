@@ -19,7 +19,15 @@ type BpmOptions struct {
     Command string
 }
 
-func GetSkipNpmInstall(args []string) bool {
+func (options *BpmOptions) ParseOptions(args []string) {
+    options.SkipNpmInstall = options.GetSkipNpmInstallOption(args);
+    options.Recursive = options.GetRecursiveOption(args);
+    options.ConflictResolutionType = options.GetConflictResolutionTypeOption(args);
+    options.UseRemote = options.GetRemoteOption(args);
+    options.UseLocal = options.GetRootOption(args);
+}
+
+func (options *BpmOptions) GetSkipNpmInstallOption(args []string) bool {
     index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--skipnpm") == 0 });
     if index == -1 {
         return false;
@@ -28,7 +36,7 @@ func GetSkipNpmInstall(args []string) bool {
 }
 
 
-func GetRecursiveFlag(args []string) bool {
+func (options *BpmOptions) GetRecursiveOption(args []string) bool {
     index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--recursive") == 0 });
     if index == -1 {
         return false;
@@ -36,7 +44,7 @@ func GetRecursiveFlag(args []string) bool {
     return true;
 }
 
-func GetConflictResolutionType(args []string) string{
+func (options *BpmOptions) GetConflictResolutionTypeOption(args []string) string{
     flagValue := "versioning"
     index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--resolution=") == 0 });
     if index == -1 {
@@ -49,7 +57,7 @@ func GetConflictResolutionType(args []string) string{
     return flagValue;
 }
 
-func GetRemote(args []string) string{
+func (options *BpmOptions) GetRemoteOption(args []string) string{
     remote := "origin"
     index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--remote=") == 0 });
     if index == -1 {
@@ -62,7 +70,7 @@ func GetRemote(args []string) string{
     return remote;
 }
 
-func GetLocal(args []string) string{
+func (options *BpmOptions) GetRootOption(args []string) string{
     root := ""
     index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--root=") == 0 });
     if index == -1 {
