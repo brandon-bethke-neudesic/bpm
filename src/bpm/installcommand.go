@@ -228,13 +228,12 @@ func (cmd *InstallCommand) Execute() (error) {
     installItem := "";
     if len(os.Args) > index + 1 && strings.Index(os.Args[index + 1], "--") != 0 {
         installItem = os.Args[index + 1];
+        if len(os.Args) > index + 2 && strings.Index(os.Args[index + 2], "--") != 0 {
+            newCommit = os.Args[index + 2];
+        }
     }
 
-    if len(os.Args) > index + 2 && strings.Index(os.Args[index + 2], "--") != 0 {
-        newCommit = os.Args[index + 2];
-    }
-
-    if installItem != "" && newCommit != "" {
+    if installItem != "" && newCommit != "" || strings.HasSuffix(installItem, ".git") {
         return cmd.installNew(installItem, newCommit);
     }
     return cmd.build(installItem);
