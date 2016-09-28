@@ -3,6 +3,7 @@ package main;
 import (
     "strings"
     "path"
+    "fmt"
 )
 
 
@@ -16,15 +17,56 @@ type BpmOptions struct {
     LocalModuleName string
     ExcludeFileList string
     SkipNpmInstall bool
-    Command string
+    Finalize bool
+    Command SubCommand
 }
 
+func (options *BpmOptions) getSubCommand(args []string) (SubCommand){
+    if len(args) > 1 {
+        command := strings.ToLower(args[1]);
+        if command == "init" {
+            return &InitCommand{}
+        }
+        if command == "ls" {
+            return &LsCommand{}
+        }
+        if command == "help" {
+            return &HelpCommand{};
+        }
+        if command == "clean" {
+            return &CleanCommand{}
+        }
+        if command == "update" {
+            return &UpdateCommand{}
+        }
+        if command == "install" {
+            return &InstallCommand{}
+        }
+        if command == "version" {
+            return &VersionCommand{}
+        }
+        fmt.Println("Unrecognized command", command)
+    }
+    return &HelpCommand{};
+}
+
+
 func (options *BpmOptions) ParseOptions(args []string) {
+    options.Command = options.getSubCommand(args)
     options.SkipNpmInstall = options.GetSkipNpmInstallOption(args);
     options.Recursive = options.GetRecursiveOption(args);
     options.ConflictResolutionType = options.GetConflictResolutionTypeOption(args);
     options.UseRemote = options.GetRemoteOption(args);
     options.UseLocal = options.GetRootOption(args);
+    options.Finalize = options.GetFinalizeOption(args)
+}
+
+func (options *BpmOptions) GetFinalizeOption(args []string) bool {
+    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--finalize") == 0 });
+    if index == -1 {
+        return false;
+    }
+    return true;
 }
 
 func (options *BpmOptions) GetSkipNpmInstallOption(args []string) bool {

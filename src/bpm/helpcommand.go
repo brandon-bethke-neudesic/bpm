@@ -8,6 +8,9 @@ import (
 type HelpCommand struct {
 }
 
+func (help *HelpCommand) Name() string {
+    return "help"
+}
 
 func (help *HelpCommand) Execute() (error){
     fmt.Println("");
@@ -52,13 +55,16 @@ func (help *HelpCommand) Execute() (error){
     fmt.Println("        # update the all the dependencies in the bpm.json.")
     fmt.Println("        bpm update");
     fmt.Println("");
+    fmt.Println("        # update the all the dependencies in the bpm.json to the latest commits in the specified path, if there are no outstanding changes")
+    fmt.Println("        bpm update --root=../js");
+    fmt.Println("");
     fmt.Println("        # update the existing mortar dependency to the latest commit. Use the remote origin as the root path if necessary.")
     fmt.Println("        bpm update mortar");
     fmt.Println("");
     fmt.Println("        # update the existing mortar dependency to the latest commit. Use the remote brandon as the root path if necessary.")
     fmt.Println("        bpm update mortar --remote=brandon");
     fmt.Println("");
-    fmt.Println("        # update the existing mortar dependency to the latest commit in the specified path")
+    fmt.Println("        # update the existing mortar dependency to the latest commit in the specified path, if there are no outstanding changes")
     fmt.Println("        bpm update mortar --root=../js");
     fmt.Println("");
     fmt.Println("        # update all dependencies recursively. Only works with the --root option")

@@ -13,6 +13,19 @@ type GitCommands struct {
     Path string
 }
 
+
+func (git *GitCommands) HasChanges() bool {
+    stdOut, _, err := git.RunCommand(git.Path, "git diff-index HEAD --")
+    if err != nil {
+        return false;
+    }
+    if strings.TrimSpace(stdOut) == "" {
+        return false;
+    } else {
+        return true;
+    }
+}
+
 // If commitB is printed, then commitA is an ancestor of commit B
 //"git rev-list <commitA> | grep $(git rev-parse <commitB>)"
 
@@ -147,7 +160,7 @@ func (git *GitCommands) SubmoduleUpdate(init bool, recursive bool) (error) {
     return err;
 }
 
-func (git *GitCommands) InitAndCheckoutCommit(url string, commit string) error {
+func (git *GitCommands) InitAndCheckout(url string, commit string) error {
     err := git.InitAndFetch(url)
     if err != nil {
         return err;

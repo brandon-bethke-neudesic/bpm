@@ -17,6 +17,9 @@ type InstallCommand struct {
     LocalPath string
 }
 
+func (cmd *InstallCommand) Name() string {
+    return "install"
+}
 
 func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (error) {
     bpm := BpmData{};
@@ -102,9 +105,9 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         os.RemoveAll(path.Join(itemClonePath, ".."));
         os.MkdirAll(itemClonePath, 0777)
         git := GitCommands{Path:itemClonePath}
-        err := git.InitAndCheckoutCommit(itemRemoteUrl, moduleCommit)
+        err := git.InitAndCheckout(itemRemoteUrl, moduleCommit)
         if err != nil {
-            fmt.Println("Error: There was an issue initializing the repository for dependency", moduleBpm.Name)
+            fmt.Println("Error: There was an issue initializing the repository for dependency", moduleBpm.Name, "Url:", itemRemoteUrl, "Commit:", moduleCommit)
             os.RemoveAll(itemClonePath)
             return err;
         }
@@ -135,7 +138,10 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         moduleCache.Add(cacheItem, true, itemPath)
         os.RemoveAll(path.Join(itemPath, ".."))
     }
-    GetDependencies(moduleBpm, itemRemoteUrl)
+    err := GetDependencies(moduleBpm, itemRemoteUrl)
+    if err != nil {
+        return err;
+    }
     moduleCache.Trim();
 
     if !Options.SkipNpmInstall{
@@ -156,7 +162,7 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
 
 func (cmd *InstallCommand) build(installItem string) (error) {
     if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
-        fmt.Println(Options.BpmFileName, "Error: The bpm file does not exist in the current directory.");
+        fmt.Println("Error: The bpm file does not exist in the current directory.");
         return err;
     }
 
@@ -209,7 +215,10 @@ func (cmd *InstallCommand) build(installItem string) (error) {
 
 
     fmt.Println("Processing all dependencies for", bpm.Name, "version", bpm.Version);
-    GetDependencies(newBpm, "")
+    err = GetDependencies(newBpm, "")
+    if err != nil {
+        return err;
+    }
     moduleCache.Trim();
     if !Options.SkipNpmInstall {
         err = moduleCache.NpmInstall()

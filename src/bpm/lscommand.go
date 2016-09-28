@@ -14,6 +14,10 @@ type LsCommand struct {
     LocalPath string
 }
 
+func (cmd *LsCommand) Name() string {
+    return "ls"
+}
+
 func IndentAndPrintTree(indentLevel int, mytext string){
     text := "|"
     for i := 0; i < indentLevel; i++ {

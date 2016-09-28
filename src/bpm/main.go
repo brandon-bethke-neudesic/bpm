@@ -7,6 +7,7 @@ import (
     "path"
     "net/url"
     "strings"
+    "errors"
 )
 
 var moduleCache = ModuleCache{Items:make(map[string]ModuleCacheItem)};
@@ -16,7 +17,6 @@ var Options = BpmOptions {
     BpmFileName: "bpm.json",
     LocalModuleName: "local",
     ExcludeFileList: ".git|.gitignore|.gitmodules|bpm_modules",
-    Command: "",
 }
 
 func SliceIndex(limit int, predicate func(i int) bool) int {
@@ -43,17 +43,26 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
             bpmUpdated := false
             theUrl := path.Join(Options.UseLocal, itemName);
             fmt.Println("Processing local dependency in", theUrl)
+            // Put the commit as local, since we don't really know what it should be.
+            // It's expected that the bpm install will fail if the commit is 'local' which will indicate to the user that they
+            // didn't finalize configuring the dependency
+            // However if the repo has no changes, then grab the commit
+            newCommit := "local"
             git := GitCommands{Path:theUrl}
-            newCommit, err := git.GetLatestCommit()
-            if err != nil {
-                fmt.Println("Error: There was an issue getting the latest commit for", itemName)
-                return err;
+            if (Options.Finalize || !git.HasChanges()) && Options.Command.Name() == "update" {
+                var err error;
+                newCommit, err = git.GetLatestCommit()
+                if err != nil {
+                    fmt.Println("Error: There was an issue getting the latest commit for", itemName)
+                    fmt.Println(err)
+                    return err;
+                }
             }
             itemPath := path.Join(Options.BpmCachePath, itemName, Options.LocalModuleName);
             os.RemoveAll(itemPath)
             os.MkdirAll(itemPath, 0777)
             copyDir := CopyDir{Exclude:Options.ExcludeFileList}
-            err = copyDir.Copy(theUrl, itemPath);
+            err := copyDir.Copy(theUrl, itemPath);
             if err != nil {
                 fmt.Println("Error: There was an issue trying to copy the cloned temp folder to the named folder for", itemName)
                 fmt.Println(err)
@@ -84,7 +93,7 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
                 bpmUpdated = true;
             }
             bpm.Dependencies[itemName] = newItem;
-            if Options.Recursive && bpmUpdated && Options.Command == "update" {
+            if Options.Recursive && bpmUpdated && Options.Command.Name() == "update" {
                 filePath := path.Join(Options.UseLocal, bpm.Name, Options.BpmFileName);
                 bpm.IncrementVersion();
                 bpm.WriteFile(filePath)
@@ -97,7 +106,6 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
                 fmt.Println("Error: No commit specified for " + itemName)
             }
             fmt.Println("Processing dependency", itemName)
-            workingPath,_ := os.Getwd();
             git := GitCommands{Path:workingPath}
 
             itemPath := path.Join(Options.BpmCachePath, itemName)
@@ -127,6 +135,7 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
                     }
                     parsedTmpUrl, err := url.Parse(tempUrl)
                     if err != nil {
+                        fmt.Println("Error: There is something wrong with the module url", tempUrl)
                         fmt.Println(err);
                         return err
                     }
@@ -135,8 +144,9 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
 
                 tempUrl, err := url.Parse(parentUrl)
                 if err != nil {
+                    fmt.Println("Error: There is something wrong with the module url", parentUrl)
                     fmt.Println(err);
-                    return err
+                    return err;
                 }
                 // If the item URL is a relative URL, then make a full URL using the parent url as the root.
                 if strings.Index(item.Url, "http") != 0 {
@@ -144,12 +154,11 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
                 }
                 os.Mkdir(itemClonePath, 0777)
                 git := GitCommands{Path: itemClonePath}
-                err = git.InitAndCheckoutCommit(itemRemoteUrl, item.Commit)
+                err = git.InitAndCheckout(itemRemoteUrl, item.Commit)
                 if err != nil {
-                    fmt.Println("Error: There was an issue initializing the repository for dependency", itemName)
+                    msg := "Error: There was an issue initializing the repository for dependency " + itemName + " Url: " + itemRemoteUrl + " Commit: " + item.Commit
                     os.RemoveAll(itemClonePath)
-                    os.Exit(1)
-                    return err;
+                    return errors.New(msg)
                 }
             } else {
                 fmt.Println("Module", itemName, "already exists in the bpm cache.")
@@ -163,17 +172,17 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
             if err != nil {
                 fmt.Println("Error: Could not load the bpm.json file for dependency", itemName)
                 fmt.Println(err);
-                return err
+                return err;
             }
 
             if strings.TrimSpace(moduleBpm.Name) == "" {
-                fmt.Println("Error: There must be a name field in the bpm.json for", itemName)
-                os.Exit(1);
+                msg := "Error: There must be a name field in the bpm.json for " + itemName
+                return errors.New(msg)
             }
 
             if strings.TrimSpace(moduleBpm.Version) == "" {
-                fmt.Println("Error: There must be a version field in the bpm for", itemName)
-                os.Exit(1);
+                msg := "Error: There must be a version field in the bpm for " + itemName
+                return errors.New(msg)
             }
             cacheItem := ModuleCacheItem{Name:moduleBpm.Name, Version: moduleBpm.Version, Commit: item.Commit, Path: itemClonePath}
             fmt.Println("Adding to cache", cacheItem.Name)
@@ -181,47 +190,19 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
 
             fmt.Println("Processing all dependencies for", moduleBpm.Name, "version", moduleBpm.Version);
 
-            GetDependencies(moduleBpm, itemRemoteUrl)
+            err = GetDependencies(moduleBpm, itemRemoteUrl)
+            if err != nil {
+                return err;
+            }
         }
     }
     return nil;
 }
 
-func GetSubCommand() (SubCommand){
-    if len(os.Args) > 1 {
-        command := strings.ToLower(os.Args[1]);
-        if command == "init" {
-            return &InitCommand{}
-        }
-        if command == "ls" {
-            return &LsCommand{}
-        }
-        if command == "help" {
-            return &HelpCommand{};
-        }
-        if command == "clean" {
-            return &CleanCommand{}
-        }
-        if command == "update" {
-            Options.Command = "update"
-            return &UpdateCommand{}
-        }
-        if command == "install" {
-            return &InstallCommand{}
-        }
-        if command == "version" {
-            return &VersionCommand{}
-        }
-        fmt.Println("Unrecognized command", command)
-    }
-    return &HelpCommand{};
-}
-
 func main() {
     workingPath,_ = os.Getwd();
     Options.ParseOptions(os.Args);
-    cmd := GetSubCommand();
-    err := cmd.Execute();
+    err := Options.Command.Execute();
     if err != nil {
         os.Exit(1)
     }

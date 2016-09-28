@@ -10,6 +10,10 @@ import (
 type InitCommand struct {
 }
 
+func (cmd *InitCommand) Name() string {
+    return "init"
+}
+
 func (cmd *InitCommand) Execute() (error) {
     index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "init" });
     if len(os.Args) <= index + 1 {

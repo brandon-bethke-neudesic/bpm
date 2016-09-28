@@ -68,6 +68,7 @@ In this example, the URL is relative. Dependency URLs can be a full URL or a rel
 The dependency url and commit are required to correctly install a dependency.
 
 When the --root option is used, instead of downloading the code from the dependency url, bpm will attempt to locate the dependency on the local disk relative to the specified root.
+
 Given the command
     bpm install --root=../mydependencies
 
@@ -106,6 +107,8 @@ Update the commit of existing dependency to the latest
 
 Example:
 
+    bpm update
+    bpm update --root=../js
     bpm update mortar
     bpm update mortar --remote=brandon
     bpm update mortar --root=../mydependencies
@@ -113,7 +116,7 @@ Example:
 
 The version number in the bpm.json will be incremented automatically when a dependency has changed.
 
-When using the `--root` option, even though uncommited local changes are always copied to the bpm_modules, it is expected that local changes are committed locally since the dependency is updated to the latest commit hash.
+When using the `--root` option, uncommited local changes are always copied to bpm_modules. If the repository contains outstanding changes, then the commit hash of the dependency will be updated to 'local', which is obviously invalid. This is to let the developer know that they need to finalize the dependency commit. To finalize, it is expected that local changes will be committed and then by running the update command again, and if there are no detected changes, then the commit hash will be updated to the latest.
 
 The --recursive option only works when specified with the --root option. bpm will recursively go through all dependencies and update the commit hashes based on the last local commit hash for the dependency. The version number of sub-dependencies are also incremented.
 
@@ -207,9 +210,6 @@ When the bpm command is run with the --root option, then the bpm_modules depende
 bpm module cache
 
 When the bpm command is run any existing items in the bpm_module cache will be used and the dependency will not be redownloaded. Additionally, if the local folder exists for the component in the module cache, then this cache item will always be used even if the cache does not contain an item for the dependency hash
-
-bmp update module-name [--root=xxx] // get latest of module, put in node_modules, update json with commit, increment version number of json file, if root is specified look in file path root/module-name, update each sub dep in node_modules with --root logic
-
 
 Dependency conflict resolution.
 

@@ -16,6 +16,10 @@ type UpdateCommand struct {
     LocalPath string
 }
 
+func (cmd *UpdateCommand) Name() string {
+    return "update"
+}
+
 func (cmd *UpdateCommand) Execute() (error) {
     cmd.GitRemote = Options.UseRemote;
     cmd.LocalPath = Options.UseLocal;
@@ -63,11 +67,19 @@ func (cmd *UpdateCommand) Execute() (error) {
         if cmd.LocalPath != "" && strings.Index(depItem.Url, "http") == -1 {
             theUrl := path.Join(cmd.LocalPath, updateModule);
             fmt.Println("Processing local dependency in", theUrl)
+            // Put the commit as local, since we don't really know what it should be.
+            // It's expected that the bpm install will fail if the commit is 'local' which will indicate to the user that they
+            // didn't finalize configuring the dependency
+            // However if the repo has no changes, then grab the commit
             git := GitCommands{Path:theUrl}
-            newCommit, err := git.GetLatestCommit()
-            if err != nil {
-                fmt.Println("Error: There was an issue getting the latest commit for", updateModule)
-                return err;
+            newCommit := "local"
+            if Options.Finalize || !git.HasChanges() {
+                var err error;
+                newCommit, err = git.GetLatestCommit()
+                if err != nil {
+                    fmt.Println("Error: There was an issue getting the latest commit for", updateModule)
+                    return err;
+                }
             }
             itemPath := path.Join(Options.BpmCachePath, updateModule, Options.LocalModuleName);
             os.RemoveAll(itemPath)
@@ -92,7 +104,10 @@ func (cmd *UpdateCommand) Execute() (error) {
                 fmt.Println(err);
                 return err
             }
-            GetDependencies(moduleBpm, "")
+            err = GetDependencies(moduleBpm, "")
+            if err != nil {
+                return err;
+            }
 
             newItem := BpmDependency{Url: depItem.Url, Commit:newCommit}
             bpm.Dependencies[updateModule] = newItem;
@@ -119,23 +134,12 @@ func (cmd *UpdateCommand) Execute() (error) {
             os.RemoveAll(itemPath)
             os.MkdirAll(itemPath, 0777)
             git := GitCommands{Path:itemPath}
-            err := git.InitAndFetch(itemRemoteUrl)
+            err = git.InitAndCheckout(itemRemoteUrl, "master")
             if err != nil {
-                fmt.Println(err)
-                return err;
+                msg := "Error: There was an issue initializing the repository for dependency " + updateModule + " Url: " + itemRemoteUrl
+                os.RemoveAll(itemPath)
+                return errors.New(msg)
             }
-            err = git.Checkout("master")
-            if err != nil {
-                fmt.Println("Error: There was an issue retrieving the repository for", updateModule)
-                return err;
-            }
-
-            err = git.SubmoduleUpdate(true, true)
-            if err != nil {
-                fmt.Println("Error: Could not update submodules for", updateModule)
-                return err;
-            }
-
             newCommit, err := git.GetLatestCommit()
             if err != nil {
                 fmt.Println("Error: There was an issue getting the latest commit for", updateModule)
@@ -169,7 +173,10 @@ func (cmd *UpdateCommand) Execute() (error) {
             cacheItem := ModuleCacheItem{Name:moduleBpm.Name, Version: moduleBpmVersion.String(), Commit: newCommit, Path: itemNewPath}
             moduleCache.Add(cacheItem, false, "")
             os.RemoveAll(itemPath);
-            GetDependencies(moduleBpm, itemRemoteUrl)
+            err = GetDependencies(moduleBpm, itemRemoteUrl)
+            if err != nil {
+                return err;
+            }
             newItem := BpmDependency{Url: depItem.Url, Commit:newCommit}
             bpm.Dependencies[updateModule] = newItem;
         }
