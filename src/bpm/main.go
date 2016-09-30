@@ -49,7 +49,7 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
             // However if the repo has no changes, then grab the commit
             newCommit := "local"
             git := GitCommands{Path:theUrl}
-            if (Options.Finalize || !git.HasChanges()) && Options.Command.Name() == "update" {
+            if Options.Command.Name() == "update" && (Options.Finalize || !git.HasChanges()) {
                 var err error;
                 newCommit, err = git.GetLatestCommit()
                 if err != nil {
@@ -93,7 +93,7 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
                 bpmUpdated = true;
             }
             bpm.Dependencies[itemName] = newItem;
-            if Options.Recursive && bpmUpdated && Options.Command.Name() == "update" {
+            if Options.Command.Name() == "update" && Options.Recursive && bpmUpdated {
                 filePath := path.Join(Options.UseLocal, bpm.Name, Options.BpmFileName);
                 bpm.IncrementVersion();
                 bpm.WriteFile(filePath)

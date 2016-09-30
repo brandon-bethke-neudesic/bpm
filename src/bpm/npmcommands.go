@@ -32,6 +32,16 @@ func (npm *NpmCommands) RunCommand(dir string, command string) error {
     return nil
 }
 
+func (npm *NpmCommands) Uninstall(item string) error {
+    fmt.Println("Running npm uninstall on", item);
+    npmCommand := "npm uninstall " + item
+    err := npm.RunCommand(npm.Path, npmCommand)
+    if err != nil {
+        return err;
+    }
+    return nil;
+}
+
 func (npm *NpmCommands) InstallUrl(url string) error {
     fmt.Println("Running npm install in", npm.Path, "on", url)
     // git clone <repo url> <destination directory>

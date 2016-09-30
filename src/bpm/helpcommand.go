@@ -70,6 +70,15 @@ func (help *HelpCommand) Execute() (error){
     fmt.Println("        # update all dependencies recursively. Only works with the --root option")
     fmt.Println("        bpm update mortar --root=../js --recursive");
     fmt.Println("")
+    fmt.Println("    uninstall")
+    fmt.Println("")
+    fmt.Println("        bpm uninstall <modulename>");
+    fmt.Println("");
+    fmt.Println("        Examples:")
+    fmt.Println("");
+    fmt.Println("        # Remove dependency from bpm_modules and perform an npm uninstall")
+    fmt.Println("        bpm uninstall my-module");
+    fmt.Println("")
     fmt.Println("    init")
     fmt.Println("")
     fmt.Println("        bpm init <modulename>");

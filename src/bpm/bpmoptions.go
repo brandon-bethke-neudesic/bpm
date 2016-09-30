@@ -45,6 +45,9 @@ func (options *BpmOptions) getSubCommand(args []string) (SubCommand){
         if command == "version" {
             return &VersionCommand{}
         }
+        if command == "uninstall" {
+            return &UninstallCommand{}
+        }
         fmt.Println("Unrecognized command", command)
     }
     return &HelpCommand{};

@@ -121,6 +121,16 @@ When using the `--root` option, uncommited local changes are always copied to bp
 The --recursive option only works when specified with the --root option. bpm will recursively go through all dependencies and update the commit hashes based on the last local commit hash for the dependency. The version number of sub-dependencies are also incremented.
 
 
+Uninstall a dependency.
+Removed the dependency from bpm_modules and performs an npm uninstall [depName]
+
+    bpm uninstall [dependencyName]
+
+Example:
+
+    bpm uninstall mortar
+
+
 Create a default bpm.json
 
     bpm init <modulename>
