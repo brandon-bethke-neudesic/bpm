@@ -72,42 +72,18 @@ func (options *BpmOptions) getSubCommand(args []string) (SubCommand){
 
 func (options *BpmOptions) ParseOptions(args []string) {
     options.Command = options.getSubCommand(args)
-    options.SkipNpmInstall = options.GetSkipNpmInstallOption(args);
-    options.Recursive = options.GetRecursiveOption(args);
-    options.ConflictResolutionType = options.GetConflictResolutionTypeOption(args);
-    options.UseRemote = options.GetRemoteOption(args);
+    options.SkipNpmInstall = options.GetFlagOption(args, "--skipnpm")
+    options.Recursive = options.GetFlagOption(args, "--recursive")
+    options.ConflictResolutionType = options.GetNameValueOption(args, "--resolution=", "versioning")
+    options.UseRemote = options.GetNameValueOption(args, "--remote=", "origin")
     options.UseLocal = options.GetRootOption(args);
-    options.Finalize = options.GetFinalizeOption(args)
-    options.PackageManager = options.GetPackageManger(args)
+    options.Finalize = options.GetFlagOption(args, "--finalize")
+    options.PackageManager = options.GetNameValueOption(args, "--pkgm=", "npm")
 }
 
-func (options *BpmOptions) GetFinalizeOption(args []string) bool {
-    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--finalize") == 0 });
-    if index == -1 {
-        return false;
-    }
-    return true;
-}
-
-func (options *BpmOptions) GetSkipNpmInstallOption(args []string) bool {
-    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--skipnpm") == 0 });
-    if index == -1 {
-        return false;
-    }
-    return true;
-}
-
-func (options *BpmOptions) GetRecursiveOption(args []string) bool {
-    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--recursive") == 0 });
-    if index == -1 {
-        return false;
-    }
-    return true;
-}
-
-func (options *BpmOptions) GetConflictResolutionTypeOption(args []string) string{
-    flagValue := "versioning"
-    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--resolution=") == 0 });
+func (options *BpmOptions) GetNameValueOption(args []string, name string, defaultValue string) (string) {
+    flagValue := defaultValue
+    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], name) == 0 });
     if index == -1 {
         return flagValue;
     }
@@ -118,42 +94,16 @@ func (options *BpmOptions) GetConflictResolutionTypeOption(args []string) string
     return flagValue;
 }
 
-func (options *BpmOptions) GetPackageManger(args []string) string{
-    manager := "npm"
-    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--pkgm=") == 0 });
+func (options *BpmOptions) GetFlagOption(args []string, name string) (bool) {
+    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], name) == 0 });
     if index == -1 {
-        return manager;
+        return false;
     }
-    temp := strings.Split(args[index], "=")
-    if len(temp) == 2 {
-        manager = temp[1];
-    }
-    return manager;
-}
-
-func (options *BpmOptions) GetRemoteOption(args []string) string{
-    remote := "origin"
-    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--remote=") == 0 });
-    if index == -1 {
-        return remote;
-    }
-    temp := strings.Split(args[index], "=")
-    if len(temp) == 2 {
-        remote = temp[1];
-    }
-    return remote;
+    return true;
 }
 
 func (options *BpmOptions) GetRootOption(args []string) string{
-    root := ""
-    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--root=") == 0 });
-    if index == -1 {
-        return root;
-    }
-    temp := strings.Split(args[index], "=")
-    if len(temp) == 2 {
-        root = temp[1];
-    }
+    root := options.GetNameValueOption(args, "--root=", "")
     if strings.Index(root, ".") == 0 || strings.Index(root, "..") == 0 {
         root = path.Join(workingPath, root)
     }

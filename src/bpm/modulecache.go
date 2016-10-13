@@ -86,10 +86,9 @@ func (r *ModuleCache) CopyAndYarnInstall(nodeModulesPath string) (error) {
         // Delete existing copy in node_modules
         os.RemoveAll(nodeModulesItemPath);
 
-        // Perform the npm install and pass the url of the dependency. npm install ./node_modules/mydep
+        // Perform the yarn install
         yarn := YarnCommands{Path: depItem.Path}
-        yarn.PackagesRoot = yarn.GetYarnPackagesRoot(os.Args);
-        yarn.ModulesFolder = yarn.GetYarnModulesFolder(os.Args);
+        yarn.ParseOptions(os.Args);
         err := yarn.Install()
         if err != nil {
             fmt.Println("Error: Failed to yarn install module", depName)
