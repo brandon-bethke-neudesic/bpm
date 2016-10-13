@@ -5,6 +5,7 @@ import (
     "encoding/json"
     "github.com/blang/semver"
     "fmt"
+    "strings"
 )
 /*
 {
@@ -96,4 +97,23 @@ func (bpm *BpmData) LoadFile(file string) error {
     bpm.Name = jsondata.Name
     bpm.Version = jsondata.Version
     return nil;
+}
+
+func (bpm *BpmData) Clone(includeModules string) BpmData{
+    newBpm := BpmData{};
+    newBpm.Name = bpm.Name;
+    newBpm.Version = bpm.Version;
+    newBpm.Dependencies = make(map[string]BpmDependency);
+    for name, v := range bpm.Dependencies {
+        newBpm.Dependencies[name] = v
+    }
+
+    if includeModules == "all" {
+        return newBpm;
+    }
+    whitelist := strings.Split(includeModules, ",")
+    for _, name := range whitelist {
+        delete(newBpm.Dependencies, name)
+    }
+    return newBpm;
 }

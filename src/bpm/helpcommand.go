@@ -111,14 +111,27 @@ func (help *HelpCommand) Execute() (error){
     fmt.Println("        bpm help");
     fmt.Println("");
     fmt.Println("");
+    fmt.Println("Other Options")
+    fmt.Println("");
     fmt.Println("    --skipnpm");
     fmt.Println("");
-    fmt.Println("        This flag will cause bpm to skip the npm install phase")
+    fmt.Println("        This flag will cause bpm to skip the package manager install phase")
     fmt.Println("");
     fmt.Println("        Examples:")
     fmt.Println("")
     fmt.Println("        bpm install --skipnpm")
     fmt.Println("        bpm update --skipnpm")
     fmt.Println("")
+    fmt.Println("    --pkgm=");
+    fmt.Println("");
+    fmt.Println("        bpm supports npm and yarn. To specify a package manger use the --pkgm= option. By default npm is used.")
+    fmt.Println("");
+    fmt.Println("        Examples:")
+    fmt.Println("")
+    fmt.Println("        bpm --pgkm=npm")
+    fmt.Println("        bpm --pkgm=yarn [--yarn-packages-root=] [--yarn-modules-folder=]")
+    fmt.Println("")
+
+
     return nil;
 }

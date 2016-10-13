@@ -61,7 +61,7 @@ The bpm command will:
 - create a directory in the bpm_modules folder for my-component
 - git fetch the repository at the specified URL
 - git checkout the specified commit hash in a subfolder
-- run npm install on my-component/hash at which point npm will manage dependencies.
+- run a supported package manager install on my-component/hash. (npm or yarn)
 
 In this example, the URL is relative. Dependency URLs can be a full URL or a relative URL. For any dependency that has a relative url, the `--remote` option will be used to resolve the relative url to a full url. origin is the default remote. Therefore, if the origin is http://github.com/user/my-component.git, then the dependency url will be resolved to http://github.com/user/my-depencency-1.git
 
@@ -236,4 +236,11 @@ Using the --resolution option, it is possible to specify an alternative conflict
 
 The option `--resolution=revisionlist` will attempt to determine which commit is the latest commit using the git revision history.
 
-The option `--skipnpm` will skip the npm install phase.
+The option `--skipnpm` will skip the package manager install phase.
+
+Supported Package Managers
+
+bpm supports npm and yarn. To specify a package manger use the --pkgm= option. By default npm is used.
+
+    bpm --pkgm=yarn [--yarn-packages-root=] [--yarn-modules-folder=]
+    bpm --pkgm=npm

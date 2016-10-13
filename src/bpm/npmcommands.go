@@ -23,9 +23,9 @@ func (npm *NpmCommands) RunCommand(dir string, command string) error {
 	cmd.Stdout = &out
     cmd.Stderr = &errOut
 	err := cmd.Run()
+    fmt.Println(out.String())
+    fmt.Println(errOut.String())
 	if err != nil {
-        fmt.Println(errOut.String())
-        fmt.Println(out.String())
         fmt.Println(err)
         return err;
 	}

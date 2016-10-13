@@ -4,6 +4,8 @@ import (
     "strings"
     "path"
     "fmt"
+    "os"
+    "errors"
 )
 
 
@@ -18,7 +20,21 @@ type BpmOptions struct {
     ExcludeFileList string
     SkipNpmInstall bool
     Finalize bool
+    PackageManager string
     Command SubCommand
+}
+
+func (options *BpmOptions) EnsureBpmCacheFolder() {
+    if _, err := os.Stat(Options.BpmCachePath); os.IsNotExist(err) {
+        os.Mkdir(Options.BpmCachePath, 0777)
+    }
+}
+
+func (options *BpmOptions) DoesBpmFileExist() (error) {
+    if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
+        return errors.New("Error: The " + Options.BpmFileName + " file does not exist.");
+    }
+    return nil
 }
 
 func (options *BpmOptions) getSubCommand(args []string) (SubCommand){
@@ -62,6 +78,7 @@ func (options *BpmOptions) ParseOptions(args []string) {
     options.UseRemote = options.GetRemoteOption(args);
     options.UseLocal = options.GetRootOption(args);
     options.Finalize = options.GetFinalizeOption(args)
+    options.PackageManager = options.GetPackageManger(args)
 }
 
 func (options *BpmOptions) GetFinalizeOption(args []string) bool {
@@ -79,7 +96,6 @@ func (options *BpmOptions) GetSkipNpmInstallOption(args []string) bool {
     }
     return true;
 }
-
 
 func (options *BpmOptions) GetRecursiveOption(args []string) bool {
     index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--recursive") == 0 });
@@ -100,6 +116,19 @@ func (options *BpmOptions) GetConflictResolutionTypeOption(args []string) string
         flagValue = temp[1];
     }
     return flagValue;
+}
+
+func (options *BpmOptions) GetPackageManger(args []string) string{
+    manager := "npm"
+    index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], "--pkgm=") == 0 });
+    if index == -1 {
+        return manager;
+    }
+    temp := strings.Split(args[index], "=")
+    if len(temp) == 2 {
+        manager = temp[1];
+    }
+    return manager;
 }
 
 func (options *BpmOptions) GetRemoteOption(args []string) string{

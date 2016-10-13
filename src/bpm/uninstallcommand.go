@@ -15,16 +15,24 @@ func (cmd *UninstallCommand) Name() string {
     return "uninstall"
 }
 
-func (cmd *UninstallCommand) Execute() (error) {
+func (cmd *UninstallCommand) getUninstallModuleName() (string){
+    // The next parameter after the 'uninstall' must to be the module name
+    index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "uninstall" });
+    if len(os.Args) > index + 1 && strings.Index(os.Args[index + 1], "--") != 0 {
+        return os.Args[index + 1];
+    }
+    return "";
+}
 
-    if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
-        fmt.Println("Error: The bpm file does not exist in the current directory.");
+func (cmd *UninstallCommand) Execute() (error) {
+    err := Options.DoesBpmFileExist();
+    if err != nil {
+        fmt.Println(err);
         return err;
     }
-
     fmt.Println("Reading",Options.BpmFileName,"...")
     bpm := BpmData{}
-    err := bpm.LoadFile(Options.BpmFileName);
+    err = bpm.LoadFile(Options.BpmFileName);
     if err != nil {
         fmt.Println("Error: There was a problem loading the bpm file at", Options.BpmFileName)
         fmt.Println(err);
@@ -36,34 +44,30 @@ func (cmd *UninstallCommand) Execute() (error) {
         return nil;
     }
 
-    bpmModuleName := ""
-    index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "uninstall" });
-    if len(os.Args) > index + 1 && strings.Index(os.Args[index + 1], "--") != 0 {
-        bpmModuleName = os.Args[index + 1];
-    }
-
-    if bpmModuleName == "" {
+    uninstallModuleName := cmd.getUninstallModuleName();
+    if uninstallModuleName == "" {
         msg := "Error: a module name must be specified"
         fmt.Println(msg)
         return errors.New(msg)
-    } else {
-        _, exists := bpm.Dependencies[bpmModuleName];
-        if exists {
-            delete(bpm.Dependencies, bpmModuleName)
-            workingPath,_ := os.Getwd();
-            npm := NpmCommands{Path: workingPath}
-            err = npm.Uninstall(bpmModuleName)
-            if err != nil {
-                fmt.Println("Error: Failed to npm uninstall module", bpmModuleName)
-                return err;
-            }
-            itemPath := path.Join(Options.BpmCachePath, bpmModuleName);
-            os.RemoveAll(itemPath)
-            bpm.IncrementVersion();
-            bpm.WriteFile(path.Join(workingPath, Options.BpmFileName));
-        } else {
-            fmt.Println(bpmModuleName, "is not a dependency")
-        }
     }
+
+    _, exists := bpm.Dependencies[uninstallModuleName];
+    if !exists {
+        fmt.Println(uninstallModuleName, "is not a dependency")
+        return nil;
+    }
+
+    delete(bpm.Dependencies, uninstallModuleName)
+    workingPath,_ := os.Getwd();
+    npm := NpmCommands{Path: workingPath}
+    err = npm.Uninstall(uninstallModuleName)
+    if err != nil {
+        fmt.Println("Error: Failed to npm uninstall module", uninstallModuleName)
+        return err;
+    }
+    itemPath := path.Join(Options.BpmCachePath, uninstallModuleName);
+    os.RemoveAll(itemPath)
+    bpm.IncrementVersion();
+    bpm.WriteFile(path.Join(workingPath, Options.BpmFileName));
     return nil;
 }

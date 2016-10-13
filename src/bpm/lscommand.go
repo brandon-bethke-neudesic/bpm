@@ -18,7 +18,7 @@ func (cmd *LsCommand) Name() string {
     return "ls"
 }
 
-func IndentAndPrintTree(indentLevel int, mytext string){
+func (cmd *LsCommand) IndentAndPrintTree(indentLevel int, mytext string){
     text := "|"
     for i := 0; i < indentLevel; i++ {
         text = "|  " + text;
@@ -26,7 +26,7 @@ func IndentAndPrintTree(indentLevel int, mytext string){
     fmt.Println(text + mytext)
 }
 
-func IndentAndPrint(indentLevel int, mytext string){
+func (cmd *LsCommand) IndentAndPrint(indentLevel int, mytext string){
     text := "   "
     for i := 0; i < indentLevel; i++ {
         text = "   " + text;
@@ -34,7 +34,7 @@ func IndentAndPrint(indentLevel int, mytext string){
     fmt.Println(text + mytext)
 }
 
-func PrintDependencies(bpm BpmData, indentLevel int) {
+func (cmd *LsCommand) PrintDependencies(bpm BpmData, indentLevel int) {
     // Sort the dependency keys so the dependencies always print in the same order
     sortedKeys := make([]string, len(bpm.Dependencies))
     i := 0
@@ -55,19 +55,19 @@ func PrintDependencies(bpm BpmData, indentLevel int) {
         if item.Commit == "" {
             fmt.Println("Error: No commit specified for " + itemName)
         }
-        IndentAndPrintTree(indentLevel, "")
+        cmd.IndentAndPrintTree(indentLevel, "")
         workingPath,_ := os.Getwd();
         itemPath := path.Join(Options.BpmCachePath, itemName)
         itemClonePath := path.Join(workingPath, itemPath, item.Commit)
         localPath := path.Join(Options.BpmCachePath, itemName, Options.LocalModuleName)
         if PathExists(localPath) {
             itemClonePath = localPath;
-            IndentAndPrintTree(indentLevel, "--" + itemName + " @ [Local]")
+            cmd.IndentAndPrintTree(indentLevel, "--" + itemName + " @ [Local]")
         } else if !PathExists(itemClonePath) {
-            IndentAndPrintTree(indentLevel, "--" + itemName + " @ " + item.Commit + " [MISSING]")
+            cmd.IndentAndPrintTree(indentLevel, "--" + itemName + " @ " + item.Commit + " [MISSING]")
             continue
         } else {
-            IndentAndPrintTree(indentLevel, "--" + itemName + " @ " + item.Commit + " [Installed]")
+            cmd.IndentAndPrintTree(indentLevel, "--" + itemName + " @ " + item.Commit + " [Installed]")
         }
 
         // Recursively get dependencies in the current dependency
@@ -75,22 +75,22 @@ func PrintDependencies(bpm BpmData, indentLevel int) {
         moduleBpmFilePath := path.Join(itemClonePath, Options.BpmFileName)
         err := moduleBpm.LoadFile(moduleBpmFilePath);
         if err != nil {
-            IndentAndPrint(indentLevel, "Error: Could not load the bpm.json file for dependency " + itemName)
+            cmd.IndentAndPrint(indentLevel, "Error: Could not load the bpm.json file for dependency " + itemName)
             continue
         }
 
         if strings.TrimSpace(moduleBpm.Name) == "" {
             msg := "Error: There must be a name field in the bpm.json for " + itemName
-            IndentAndPrint(indentLevel, msg)
+            cmd.IndentAndPrint(indentLevel, msg)
             continue
         }
 
         if strings.TrimSpace(moduleBpm.Version) == "" {
             msg := "Error: There must be a version field in the bpm for" + itemName
-            IndentAndPrint(indentLevel, msg)
+            cmd.IndentAndPrint(indentLevel, msg)
             continue
         }
-        PrintDependencies(moduleBpm, indentLevel + 1)
+        cmd.PrintDependencies(moduleBpm, indentLevel + 1)
     }
     return;
 }
@@ -98,13 +98,14 @@ func PrintDependencies(bpm BpmData, indentLevel int) {
 func (cmd *LsCommand) Execute() (error) {
     cmd.GitRemote = Options.UseRemote;
     cmd.LocalPath = Options.UseLocal;
-    if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
-        fmt.Println("Error: The bpm.json file does not exist.")
+    err := Options.DoesBpmFileExist();
+    if err != nil {
+        fmt.Println(err);
         return err;
     }
 
     bpm := BpmData{};
-    err := bpm.LoadFile(Options.BpmFileName);
+    err = bpm.LoadFile(Options.BpmFileName);
     if err != nil {
         fmt.Println("Error: There was a problem loading the bpm file at", Options.BpmFileName)
         fmt.Println(err);
@@ -117,7 +118,7 @@ func (cmd *LsCommand) Execute() (error) {
 
     fmt.Println("")
     fmt.Println(bpm.Name)
-    PrintDependencies(bpm, 0)
+    cmd.PrintDependencies(bpm, 0)
     fmt.Println("")
     return nil;
 }

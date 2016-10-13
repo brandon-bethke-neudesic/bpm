@@ -7,14 +7,10 @@ import (
     "path"
     "net/url"
     "github.com/blang/semver"
-    "errors"
 )
 
 
 type InstallCommand struct {
-    BpmModuleName string
-    GitRemote string
-    LocalPath string
 }
 
 func (cmd *InstallCommand) Name() string {
@@ -23,24 +19,25 @@ func (cmd *InstallCommand) Name() string {
 
 func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (error) {
     bpm := BpmData{};
-    if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
-        fmt.Println("Error: The bpm file does not exist. Please use the new command to create the file");
+    err := Options.DoesBpmFileExist();
+    if err != nil {
+        fmt.Println(err);
         return err;
-    } else {
-        err := bpm.LoadFile(Options.BpmFileName);
-        if err != nil {
-            fmt.Println("Error: There was a problem loading the bpm file at", Options.BpmFileName)
-            fmt.Println(err);
-            return err;
-        }
     }
+    err = bpm.LoadFile(Options.BpmFileName);
+    if err != nil {
+        fmt.Println("Error: There was a problem loading the bpm file at", Options.BpmFileName)
+        fmt.Println(err);
+        return err;
+    }
+    Options.EnsureBpmCacheFolder();
 
     itemRemoteUrl := moduleUrl;
     if strings.Index(moduleUrl, "http") != 0 {
         git := GitCommands{Path:workingPath}
-        tmpUrl, err := git.GetRemoteUrl(cmd.GitRemote);
+        tmpUrl, err := git.GetRemoteUrl(Options.UseRemote);
         if err != nil {
-            fmt.Println("Error: There was a problem getting the remote url", cmd.GitRemote)
+            fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
             return err;
         }
 
@@ -138,14 +135,14 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         moduleCache.Add(cacheItem, true, itemPath)
         os.RemoveAll(path.Join(itemPath, ".."))
     }
-    err := GetDependencies(moduleBpm, itemRemoteUrl)
+    err = ProcessDependencies(moduleBpm, itemRemoteUrl)
     if err != nil {
         return err;
     }
     moduleCache.Trim();
 
     if !Options.SkipNpmInstall{
-        err := moduleCache.NpmInstall()
+        err := moduleCache.Install()
         if err != nil {
             return err;
         }
@@ -161,14 +158,14 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
 }
 
 func (cmd *InstallCommand) build(installItem string) (error) {
-    if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
-        fmt.Println("Error: The bpm file does not exist in the current directory.");
+    err := Options.DoesBpmFileExist();
+    if err != nil {
+        fmt.Println(err);
         return err;
     }
-
     fmt.Println("Reading",Options.BpmFileName,"...")
     bpm := BpmData{}
-    err := bpm.LoadFile(Options.BpmFileName);
+    err = bpm.LoadFile(Options.BpmFileName);
     if err != nil {
         fmt.Println("Error: There was a problem loading the bpm file at", Options.BpmFileName)
         fmt.Println(err);
@@ -179,10 +176,7 @@ func (cmd *InstallCommand) build(installItem string) (error) {
         fmt.Println("There are no dependencies")
         return nil;
     }
-
-    if _, err := os.Stat(Options.BpmCachePath); os.IsNotExist(err) {
-        os.Mkdir(Options.BpmCachePath, 0777)
-    }
+    Options.EnsureBpmCacheFolder();
 
     if strings.TrimSpace(bpm.Name) == "" {
         fmt.Println("Error: There must be a name field in the bpm")
@@ -194,34 +188,15 @@ func (cmd *InstallCommand) build(installItem string) (error) {
         return err;
     }
 
-    newBpm := BpmData{};
-    newBpm.Name = bpm.Name;
-    newBpm.Version = bpm.Version;
-    newBpm.Dependencies = make(map[string]BpmDependency);
-
-    if installItem == "" {
-        for name, v := range bpm.Dependencies {
-            newBpm.Dependencies[name] = v
-        }
-    } else {
-        depItem, exists := bpm.Dependencies[installItem];
-        if !exists {
-            msg := "Error: Could not find module " + installItem + " in the dependencies";
-            fmt.Println(msg)
-            return errors.New(msg)
-        }
-        newBpm.Dependencies[installItem] = depItem;
-    }
-
-
+    newBpm := bpm.Clone(installItem);
     fmt.Println("Processing all dependencies for", bpm.Name, "version", bpm.Version);
-    err = GetDependencies(newBpm, "")
+    err = ProcessDependencies(newBpm, "")
     if err != nil {
         return err;
     }
     moduleCache.Trim();
     if !Options.SkipNpmInstall {
-        err = moduleCache.NpmInstall()
+        err = moduleCache.Install()
         if err != nil {
             return err;
         }
@@ -230,8 +205,6 @@ func (cmd *InstallCommand) build(installItem string) (error) {
 }
 
 func (cmd *InstallCommand) Execute() (error) {
-    cmd.GitRemote = Options.UseRemote;
-    cmd.LocalPath = Options.UseLocal;
     index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "install" });
     newCommit := ""
     installItem := "";

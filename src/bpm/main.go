@@ -36,7 +36,7 @@ func PathExists(path string) (bool) {
     return true
 }
 
-func GetDependencies(bpm BpmData, parentUrl string) (error) {
+func ProcessDependencies(bpm BpmData, parentUrl string) (error) {
     for itemName, item := range bpm.Dependencies {
 
         if Options.UseLocal != "" && strings.Index(item.Url, "http") == -1 {
@@ -82,7 +82,7 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
                 return err
             }
 
-            err = GetDependencies(moduleBpm, "")
+            err = ProcessDependencies(moduleBpm, "")
             if err != nil {
                 return err;
             }
@@ -190,7 +190,7 @@ func GetDependencies(bpm BpmData, parentUrl string) (error) {
 
             fmt.Println("Processing all dependencies for", moduleBpm.Name, "version", moduleBpm.Version);
 
-            err = GetDependencies(moduleBpm, itemRemoteUrl)
+            err = ProcessDependencies(moduleBpm, itemRemoteUrl)
             if err != nil {
                 return err;
             }

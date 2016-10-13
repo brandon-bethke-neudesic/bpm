@@ -25,6 +25,19 @@ func (r *ModuleCache) Delete(item string) {
     return
 }
 
+func (r *ModuleCache) Install() (error) {
+
+    if Options.PackageManager == "npm" {
+        return r.NpmInstall()
+        return nil;
+    } else if Options.PackageManager == "yarn" {
+        return r.CopyAndYarnInstall("./node_modules");
+    } else {
+        fmt.Println("Error: Unrecognized package manager", Options.PackageManager)
+        return nil;
+    }
+}
+
 func (r *ModuleCache) NpmInstall() (error){
     fmt.Println("Npm installing dependencies to node_modules...")
     workingPath,_ := os.Getwd();
@@ -59,6 +72,42 @@ func (r *ModuleCache) Trim() (error) {
     return nil
 }
 
+func (r *ModuleCache) CopyAndYarnInstall(nodeModulesPath string) (error) {
+    fmt.Println("Copying dependencies to the node_modules folder")
+    if _, err := os.Stat(nodeModulesPath); os.IsNotExist(err) {
+        fmt.Println("node_modules folder not found. Creating it...")
+        os.Mkdir(nodeModulesPath, 0777)
+    }
+    // Go through each item in the bpm memory cache. There is suppose to only be one item per dependency
+    for depName := range r.Items {
+        fmt.Println("Processing cached dependency", depName)
+        depItem := r.Items[depName];
+        nodeModulesItemPath := path.Join(nodeModulesPath, depName);
+        // Delete existing copy in node_modules
+        os.RemoveAll(nodeModulesItemPath);
+
+        // Perform the npm install and pass the url of the dependency. npm install ./node_modules/mydep
+        yarn := YarnCommands{Path: depItem.Path}
+        yarn.PackagesRoot = yarn.GetYarnPackagesRoot(os.Args);
+        yarn.ModulesFolder = yarn.GetYarnModulesFolder(os.Args);
+        err := yarn.Install()
+        if err != nil {
+            fmt.Println("Error: Failed to yarn install module", depName)
+            return err;
+        }
+
+        // Copy the library to the node_modules folder
+        copyDir := CopyDir{Exclude:Options.ExcludeFileList}
+        err = copyDir.Copy(depItem.Path, nodeModulesItemPath);
+        if err != nil {
+            fmt.Println("Error: Failed to copy module to node_modules folder")
+            fmt.Println(err)
+            return err;
+        }
+    }
+    return nil;
+}
+
 func (r *ModuleCache) CopyAndNpmInstall(nodeModulesPath string) (error){
     fmt.Println("Copying dependencies to the node_modules folder")
     if _, err := os.Stat(nodeModulesPath); os.IsNotExist(err) {
@@ -89,7 +138,6 @@ func (r *ModuleCache) CopyAndNpmInstall(nodeModulesPath string) (error){
             fmt.Println("Error: Failed to npm install module", depName)
             return err;
         }
-
     }
     return nil;
 }

@@ -12,6 +12,6 @@ func (cmd *VersionCommand) Name() string {
 }
 
 func (cmd *VersionCommand) Execute() (error) {
-    fmt.Println("bpm version 1.0.8")
+    fmt.Println("bpm version 1.0.9")
     return nil
 }

@@ -12,31 +12,29 @@ import (
 
 
 type UpdateCommand struct {
-    GitRemote string
-    LocalPath string
 }
 
 func (cmd *UpdateCommand) Name() string {
     return "update"
 }
 
-func (cmd *UpdateCommand) Execute() (error) {
-    cmd.GitRemote = Options.UseRemote;
-    cmd.LocalPath = Options.UseLocal;
-
-    bpmModuleName := ""
+func (cmd *UpdateCommand) getUpdateModuleName() (string){
+    // The next parameter after the 'uninstall' must to be the module name
     index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "update" });
     if len(os.Args) > index + 1 && strings.Index(os.Args[index + 1], "--") != 0 {
-        bpmModuleName = os.Args[index + 1];
+        return os.Args[index + 1];
     }
+    return "";
+}
 
-    if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
-        fmt.Println("Error: The bpm.json file does not exist.")
+func (cmd *UpdateCommand) Execute() (error) {
+    err := Options.DoesBpmFileExist();
+    if err != nil {
+        fmt.Println(err);
         return err;
     }
-
     bpm := BpmData{};
-    err := bpm.LoadFile(Options.BpmFileName);
+    err = bpm.LoadFile(Options.BpmFileName);
     if err != nil {
         fmt.Println("Error: There was a problem loading the bpm file at", Options.BpmFileName)
         fmt.Println(err);
@@ -46,9 +44,8 @@ func (cmd *UpdateCommand) Execute() (error) {
         fmt.Println("There are no dependencies. Done.")
         return nil;
     }
-
     depsToProcess := make(map[string]BpmDependency);
-
+    bpmModuleName := cmd.getUpdateModuleName()
     if bpmModuleName == "" {
         for name, v := range bpm.Dependencies {
             depsToProcess[name] = v
@@ -64,8 +61,8 @@ func (cmd *UpdateCommand) Execute() (error) {
     }
 
     for updateModule, depItem := range depsToProcess {
-        if cmd.LocalPath != "" && strings.Index(depItem.Url, "http") == -1 {
-            theUrl := path.Join(cmd.LocalPath, updateModule);
+        if Options.UseLocal != "" && strings.Index(depItem.Url, "http") == -1 {
+            theUrl := path.Join(Options.UseLocal, updateModule);
             fmt.Println("Processing local dependency in", theUrl)
             // Put the commit as local, since we don't really know what it should be.
             // It's expected that the bpm install will fail if the commit is 'local' which will indicate to the user that they
@@ -104,7 +101,7 @@ func (cmd *UpdateCommand) Execute() (error) {
                 fmt.Println(err);
                 return err
             }
-            err = GetDependencies(moduleBpm, "")
+            err = ProcessDependencies(moduleBpm, "")
             if err != nil {
                 return err;
             }
@@ -116,9 +113,9 @@ func (cmd *UpdateCommand) Execute() (error) {
             itemRemoteUrl := depItem.Url;
             if strings.Index(depItem.Url, "http") != 0 {
                 git := GitCommands{Path:workingPath}
-                theUrl, err := git.GetRemoteUrl(cmd.GitRemote)
+                theUrl, err := git.GetRemoteUrl(Options.UseRemote)
                 if err != nil {
-                    fmt.Println("Error: There was a problem getting the remote url", cmd.GitRemote)
+                    fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
                     return err;
                 }
                 remoteUrl, err := url.Parse(theUrl)
@@ -173,7 +170,7 @@ func (cmd *UpdateCommand) Execute() (error) {
             cacheItem := ModuleCacheItem{Name:moduleBpm.Name, Version: moduleBpmVersion.String(), Commit: newCommit, Path: itemNewPath}
             moduleCache.Add(cacheItem, false, "")
             os.RemoveAll(itemPath);
-            err = GetDependencies(moduleBpm, itemRemoteUrl)
+            err = ProcessDependencies(moduleBpm, itemRemoteUrl)
             if err != nil {
                 return err;
             }
@@ -183,7 +180,7 @@ func (cmd *UpdateCommand) Execute() (error) {
     }
     moduleCache.Trim();
     if !Options.SkipNpmInstall {
-        err = moduleCache.NpmInstall()
+        err = moduleCache.Install()
         if err != nil {
             fmt.Println("Error: There was an issue performing npm install on the dependencies")
             return err;
