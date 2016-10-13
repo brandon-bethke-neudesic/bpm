@@ -36,6 +36,34 @@ func PathExists(path string) (bool) {
     return true
 }
 
+func MakeRemoteUrl(itemUrl string) (string, error) {
+    adjustedUrl := itemUrl;
+    if adjustedUrl == "" {
+        git := GitCommands{Path:workingPath}
+        var err error;
+        adjustedUrl, err = git.GetRemoteUrl(Options.UseRemote)
+        if err != nil {
+            fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
+            return "", err
+        }
+    } else if strings.Index(adjustedUrl, "http") != 0 {
+        git := GitCommands{Path:workingPath}
+        remoteUrl, err := git.GetRemoteUrl(Options.UseRemote)
+        if err != nil {
+            fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
+            return "", err;
+        }
+        parsedUrl, err := url.Parse(remoteUrl)
+        if err != nil {
+            fmt.Println("Error: There was a problem parsing the remote url", remoteUrl)
+            fmt.Println(err);
+            return "", err;
+        }
+        adjustedUrl = parsedUrl.Scheme + "://" + path.Join(parsedUrl.Host, parsedUrl.Path, itemUrl)
+    }
+    return adjustedUrl, nil;
+}
+
 func ProcessDependencies(bpm BpmData, parentUrl string) (error) {
     for itemName, item := range bpm.Dependencies {
 
@@ -106,7 +134,6 @@ func ProcessDependencies(bpm BpmData, parentUrl string) (error) {
                 fmt.Println("Error: No commit specified for " + itemName)
             }
             fmt.Println("Processing dependency", itemName)
-            git := GitCommands{Path:workingPath}
 
             itemPath := path.Join(Options.BpmCachePath, itemName)
             os.Mkdir(itemPath, 0777)
@@ -119,29 +146,8 @@ func ProcessDependencies(bpm BpmData, parentUrl string) (error) {
                 itemClonePath = localPath;
             } else if !PathExists(itemClonePath) {
                 fmt.Println("Could not find module", itemName, "in the bpm cache. Cloning repository...")
-                // If the parent URL is unspecified then use the remote URL as parent.
-                if parentUrl == "" {
-                    tempUrl, err := git.GetRemoteUrl(Options.UseRemote)
-                    if err != nil {
-                        fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
-                        return err
-                    }
-                    parentUrl = tempUrl
-                } else if strings.Index(parentUrl, "http") != 0 {
-                    tempUrl, err := git.GetRemoteUrl(Options.UseRemote)
-                    if err != nil {
-                        fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
-                        return err
-                    }
-                    parsedTmpUrl, err := url.Parse(tempUrl)
-                    if err != nil {
-                        fmt.Println("Error: There is something wrong with the module url", tempUrl)
-                        fmt.Println(err);
-                        return err
-                    }
-                    parentUrl = parsedTmpUrl.Scheme + "://" + path.Join(parsedTmpUrl.Host, parsedTmpUrl.Path, parentUrl)
-                }
-
+                var err error;
+                parentUrl, err = MakeRemoteUrl(parentUrl);
                 tempUrl, err := url.Parse(parentUrl)
                 if err != nil {
                     fmt.Println("Error: There is something wrong with the module url", parentUrl)

@@ -5,7 +5,6 @@ import (
     "fmt"
     "os"
     "path"
-    "net/url"
     "strings"
     "github.com/blang/semver"
 )
@@ -110,23 +109,11 @@ func (cmd *UpdateCommand) Execute() (error) {
             bpm.Dependencies[updateModule] = newItem;
 
         } else {
-            itemRemoteUrl := depItem.Url;
-            if strings.Index(depItem.Url, "http") != 0 {
-                git := GitCommands{Path:workingPath}
-                theUrl, err := git.GetRemoteUrl(Options.UseRemote)
-                if err != nil {
-                    fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
-                    return err;
-                }
-                remoteUrl, err := url.Parse(theUrl)
-                if err != nil {
-                    fmt.Println("Error: There was a problem parsing the remote url", theUrl)
-                    fmt.Println(err);
-                    return err;
-                }
-                itemRemoteUrl = remoteUrl.Scheme + "://" + path.Join(remoteUrl.Host, remoteUrl.Path, depItem.Url)
-            }
 
+            itemRemoteUrl, err := MakeRemoteUrl(depItem.Url)
+            if err != nil {
+                return err;
+            }
             itemPath := path.Join(Options.BpmCachePath, updateModule, "xx_temp_xx")
             os.RemoveAll(itemPath)
             os.MkdirAll(itemPath, 0777)

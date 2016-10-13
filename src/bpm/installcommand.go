@@ -5,7 +5,6 @@ import (
     "fmt"
     "strings"
     "path"
-    "net/url"
     "github.com/blang/semver"
 )
 
@@ -32,21 +31,10 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
     }
     Options.EnsureBpmCacheFolder();
 
-    itemRemoteUrl := moduleUrl;
-    if strings.Index(moduleUrl, "http") != 0 {
-        git := GitCommands{Path:workingPath}
-        tmpUrl, err := git.GetRemoteUrl(Options.UseRemote);
-        if err != nil {
-            fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
-            return err;
-        }
-
-        remoteUrl, err := url.Parse(tmpUrl)
-        if err != nil {
-            fmt.Println(err);
-            return err;
-        }
-        itemRemoteUrl = remoteUrl.Scheme + "://" + path.Join(remoteUrl.Host, remoteUrl.Path, moduleUrl)
+    itemRemoteUrl, err := MakeRemoteUrl(moduleUrl);
+    if err != nil {
+        fmt.Println(err)
+        return err;
     }
     moduleBpm := BpmData{};
 
