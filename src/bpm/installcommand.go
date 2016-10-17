@@ -5,7 +5,6 @@ import (
     "fmt"
     "strings"
     "path"
-    "github.com/blang/semver"
 )
 
 
@@ -36,93 +35,15 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         fmt.Println(err)
         return err;
     }
-    moduleBpm := BpmData{};
-
+    var moduleBpm *BpmData;
     if len(strings.TrimSpace(moduleCommit)) == 0 {
-        itemPath := path.Join(Options.BpmCachePath, "xx_temp_xx", "xx_temp_xx")
-        os.RemoveAll(path.Join(itemPath, ".."));
-        os.MkdirAll(itemPath, 0777)
-        git := GitCommands{Path:itemPath}
-        err := git.InitAndFetch(itemRemoteUrl)
-        if err != nil {
-            fmt.Println(err)
-            return err;
-        }
-        err = git.Checkout("master")
-        if err != nil {
-            fmt.Println("Error: There was an issue retrieving the repository.")
-            return err;
-        }
-        moduleCommit, err = git.GetLatestCommit()
-        if err != nil {
-            fmt.Println(err)
-            return err;
-        }
-
-        moduleBpmFilePath := path.Join(itemPath, Options.BpmFileName);
-        err = moduleBpm.LoadFile(moduleBpmFilePath);
-        if err != nil {
-            fmt.Println("Error: Could not load the bpm.json file for dependency at", moduleBpmFilePath)
-            fmt.Println(err);
-            return err;
-        }
-        moduleBpmVersion, err := semver.Make(moduleBpm.Version);
-        if err != nil {
-            fmt.Println("Error: Could not read the version");
-            return err;
-        }
-
-        itemNewPath := path.Join(Options.BpmCachePath, moduleBpm.Name, moduleCommit);
-        os.RemoveAll(itemNewPath)
-        copyDir := CopyDir{Exclude:Options.ExcludeFileList}
-        err = copyDir.Copy(itemPath, itemNewPath);
-        if err != nil {
-            fmt.Println(err)
-            return err;
-        }
-
-        cacheItem := ModuleCacheItem{Name:moduleBpm.Name, Version: moduleBpmVersion.String(), Commit: moduleCommit, Path: itemNewPath}
-        moduleCache.Add(cacheItem, true, itemPath)
-        os.RemoveAll(path.Join(itemPath, ".."))
-    } else {
-        itemPath := path.Join(Options.BpmCachePath, "xx_temp_xx", moduleCommit)
-        itemClonePath := path.Join(workingPath, itemPath, moduleCommit)
-        os.RemoveAll(path.Join(itemClonePath, ".."));
-        os.MkdirAll(itemClonePath, 0777)
-        git := GitCommands{Path:itemClonePath}
-        err := git.InitAndCheckout(itemRemoteUrl, moduleCommit)
-        if err != nil {
-            fmt.Println("Error: There was an issue initializing the repository for dependency", moduleBpm.Name, "Url:", itemRemoteUrl, "Commit:", moduleCommit)
-            os.RemoveAll(itemClonePath)
-            return err;
-        }
-
-        moduleBpmFilePath := path.Join(itemPath, Options.BpmFileName);
-        err = moduleBpm.LoadFile(moduleBpmFilePath);
-        if err != nil {
-            fmt.Println("Error: Could not load the bpm.json file for dependency at", moduleBpmFilePath)
-            fmt.Println(err);
-            return err;
-        }
-
-        moduleBpmVersion, err := semver.Make(moduleBpm.Version);
-        if err != nil {
-            fmt.Println("Could not read the version");
-            return err;
-        }
-
-        itemNewPath := path.Join(Options.BpmCachePath, moduleBpm.Name, moduleCommit);
-        copyDir := CopyDir{Exclude:Options.ExcludeFileList}
-        err = copyDir.Copy(itemPath, itemNewPath);
-        if err != nil {
-            fmt.Println(err)
-            return err;
-        }
-
-        cacheItem := ModuleCacheItem{Name:moduleBpm.Name, Version: moduleBpmVersion.String(), Commit: moduleCommit, Path: itemNewPath}
-        moduleCache.Add(cacheItem, true, itemPath)
-        os.RemoveAll(path.Join(itemPath, ".."))
+        moduleCommit = "master";
     }
+    moduleBpm, cacheItem, err := ProcessRemoteModule(itemRemoteUrl, moduleCommit)
+    if err != nil {
+        return err;
+    }
+    moduleCache.AddLatest(cacheItem)
     err = ProcessDependencies(moduleBpm, itemRemoteUrl)
     if err != nil {
         return err;
@@ -136,7 +57,7 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         }
     }
 
-    newItem := BpmDependency{Url:moduleUrl, Commit:moduleCommit};
+    newItem := BpmDependency{Url:moduleUrl, Commit:cacheItem.Commit};
     bpm.Dependencies[moduleBpm.Name] = newItem;
 
     bpm.IncrementVersion();
@@ -159,23 +80,17 @@ func (cmd *InstallCommand) build(installItem string) (error) {
         fmt.Println(err);
         return err;
     }
-
+    fmt.Println("Validating bpm.json")
+    err = bpm.Validate();
+    if err != nil {
+        fmt.Println(err);
+        return err;
+    }
     if !bpm.HasDependencies() {
         fmt.Println("There are no dependencies")
         return nil;
     }
     Options.EnsureBpmCacheFolder();
-
-    if strings.TrimSpace(bpm.Name) == "" {
-        fmt.Println("Error: There must be a name field in the bpm")
-        return err;
-    }
-
-    if strings.TrimSpace(bpm.Version) == "" {
-        fmt.Println("Error: There must be a version field in the bpm")
-        return err;
-    }
-
     newBpm := bpm.Clone(installItem);
     fmt.Println("Processing all dependencies for", bpm.Name, "version", bpm.Version);
     err = ProcessDependencies(newBpm, "")

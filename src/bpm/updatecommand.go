@@ -6,7 +6,6 @@ import (
     "os"
     "path"
     "strings"
-    "github.com/blang/semver"
 )
 
 
@@ -43,69 +42,39 @@ func (cmd *UpdateCommand) Execute() (error) {
         fmt.Println("There are no dependencies. Done.")
         return nil;
     }
-    depsToProcess := make(map[string]BpmDependency);
+
     bpmModuleName := cmd.getUpdateModuleName()
-    if bpmModuleName == "" {
-        for name, v := range bpm.Dependencies {
-            depsToProcess[name] = v
-        }
-    } else {
-        depItem, exists := bpm.Dependencies[bpmModuleName];
-        if !exists {
-            msg := "Error: Could not find module " + bpmModuleName + " in the dependencies";
-            fmt.Println(msg)
-            return errors.New(msg)
-        }
-        depsToProcess[bpmModuleName] = depItem;
+    if bpmModuleName != "" && !bpm.HasDependency(bpmModuleName) {
+        msg := "Error: Could not find module " + bpmModuleName + " in the dependencies";
+        fmt.Println(msg)
+        return errors.New(msg)
     }
 
-    for updateModule, depItem := range depsToProcess {
+    for updateModule, depItem := range bpm.Dependencies {
+        // If a specific module name was specified then skip the others.
+        if bpmModuleName != "" && bpmModuleName != updateModule {
+            continue;
+        }
         if Options.UseLocal != "" && strings.Index(depItem.Url, "http") == -1 {
-            theUrl := path.Join(Options.UseLocal, updateModule);
-            fmt.Println("Processing local dependency in", theUrl)
-            // Put the commit as local, since we don't really know what it should be.
-            // It's expected that the bpm install will fail if the commit is 'local' which will indicate to the user that they
-            // didn't finalize configuring the dependency
-            // However if the repo has no changes, then grab the commit
-            git := GitCommands{Path:theUrl}
-            newCommit := "local"
-            if Options.Finalize || !git.HasChanges() {
-                var err error;
-                newCommit, err = git.GetLatestCommit()
-                if err != nil {
-                    fmt.Println("Error: There was an issue getting the latest commit for", updateModule)
-                    return err;
-                }
-            }
-            itemPath := path.Join(Options.BpmCachePath, updateModule, Options.LocalModuleName);
-            os.RemoveAll(itemPath)
-            os.MkdirAll(itemPath, 0777)
-            copyDir := CopyDir{Exclude:Options.ExcludeFileList}
-            err = copyDir.Copy(theUrl, itemPath);
+            moduleSourceUrl := path.Join(Options.UseLocal, updateModule);
+            fmt.Println("Processing local dependency in", moduleSourceUrl)
+            commit, err := DetermineCommitValue(moduleSourceUrl)
             if err != nil {
-                fmt.Println("Error: There was an issue trying to copy the cloned temp folder to the named folder for", updateModule)
+                fmt.Println("Error: There was an issue getting the latest commit for", updateModule)
                 fmt.Println(err)
                 return err;
             }
-            //os.RemoveAll(itemPath);
-
-            cacheItem := ModuleCacheItem{Name:updateModule, Path: itemPath}
-            moduleCache.Add(cacheItem, false, "")
-
-            moduleBpm := BpmData{};
-            moduleBpmFilePath := path.Join(itemPath, Options.BpmFileName);
-            err = moduleBpm.LoadFile(moduleBpmFilePath);
+            moduleBpm, cacheItem, err := ProcessLocalModule(moduleSourceUrl)
             if err != nil {
-                fmt.Println("Error: Could not load the bpm.json file for dependency", updateModule)
-                fmt.Println(err);
-                return err
+                return err;
             }
+            moduleCache.Add(cacheItem)
             err = ProcessDependencies(moduleBpm, "")
             if err != nil {
                 return err;
             }
 
-            newItem := BpmDependency{Url: depItem.Url, Commit:newCommit}
+            newItem := BpmDependency{Url: depItem.Url, Commit:commit}
             bpm.Dependencies[updateModule] = newItem;
 
         } else {
@@ -114,54 +83,16 @@ func (cmd *UpdateCommand) Execute() (error) {
             if err != nil {
                 return err;
             }
-            itemPath := path.Join(Options.BpmCachePath, updateModule, "xx_temp_xx")
-            os.RemoveAll(itemPath)
-            os.MkdirAll(itemPath, 0777)
-            git := GitCommands{Path:itemPath}
-            err = git.InitAndCheckout(itemRemoteUrl, "master")
+            moduleBpm, cacheItem, err := ProcessRemoteModule(itemRemoteUrl, "master")
             if err != nil {
-                msg := "Error: There was an issue initializing the repository for dependency " + updateModule + " Url: " + itemRemoteUrl
-                os.RemoveAll(itemPath)
-                return errors.New(msg)
-            }
-            newCommit, err := git.GetLatestCommit()
-            if err != nil {
-                fmt.Println("Error: There was an issue getting the latest commit for", updateModule)
                 return err;
             }
-
-            moduleBpm := BpmData{};
-            moduleBpmFilePath := path.Join(itemPath, Options.BpmFileName);
-            err = moduleBpm.LoadFile(moduleBpmFilePath);
-            if err != nil {
-                fmt.Println("Error: Could not load the bpm.json file for dependency", updateModule)
-                fmt.Println(err);
-                return err;
-            }
-            itemNewPath := path.Join(Options.BpmCachePath, updateModule, newCommit);
-            os.RemoveAll(itemNewPath)
-            copyDir := CopyDir{Exclude:Options.ExcludeFileList}
-            err = copyDir.Copy(itemPath, itemNewPath);
-            if err != nil {
-                fmt.Println("Error: There was an issue trying to copy the cloned temp folder to the named folder for", updateModule)
-                fmt.Println(err)
-                return err;
-            }
-
-            moduleBpmVersion, err := semver.Make(moduleBpm.Version);
-            if err != nil {
-                fmt.Println("Error: Could not read the version field from the bpm file for dependency", updateModule);
-                return err;
-            }
-
-            cacheItem := ModuleCacheItem{Name:moduleBpm.Name, Version: moduleBpmVersion.String(), Commit: newCommit, Path: itemNewPath}
-            moduleCache.Add(cacheItem, false, "")
-            os.RemoveAll(itemPath);
+            moduleCache.Add(cacheItem)
             err = ProcessDependencies(moduleBpm, itemRemoteUrl)
             if err != nil {
                 return err;
             }
-            newItem := BpmDependency{Url: depItem.Url, Commit:newCommit}
+            newItem := BpmDependency{Url: depItem.Url, Commit:cacheItem.Commit}
             bpm.Dependencies[updateModule] = newItem;
         }
     }

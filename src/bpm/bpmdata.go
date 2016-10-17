@@ -6,6 +6,7 @@ import (
     "github.com/blang/semver"
     "fmt"
     "strings"
+    "errors"
 )
 /*
 {
@@ -27,6 +28,16 @@ import (
 type BpmDependency struct {
     Commit string `json:"commit"`
     Url    string `json:"url"`
+}
+
+func (dep *BpmDependency) Validate() (error) {
+    if strings.TrimSpace(dep.Url) == "" {
+        return errors.New("Error: No url specified")
+    }
+    if strings.TrimSpace(dep.Commit) == "" {
+        return errors.New("Error: No commit specified")
+    }
+    return nil
 }
 
 func (dep *BpmDependency) Equal(item BpmDependency) bool {
@@ -51,6 +62,11 @@ func (bpm *BpmData) IncrementVersion() (error){
     bpmVersion.Patch++;
     bpm.Version = bpmVersion.String();
     return nil;
+}
+
+func (bpm *BpmData) HasDependency(name string) bool {
+    _, exists := bpm.Dependencies[name];
+    return exists;
 }
 
 func (bpm *BpmData) HasDependencies() bool {
@@ -83,6 +99,17 @@ func (bpm *BpmData) WriteFile(file string) error {
     return nil;
 }
 
+func (bpm *BpmData) Validate() error {
+    if strings.TrimSpace(bpm.Name) == "" {
+        return errors.New("Error: There must be a name field in the bpm")
+    }
+
+    if strings.TrimSpace(bpm.Version) == "" {
+        return errors.New("Error: There must be a version field in the bpm")
+    }
+    return nil;
+}
+
 func (bpm *BpmData) LoadFile(file string) error {
     dat, err := ioutil.ReadFile(file)
     if err != nil {
@@ -99,8 +126,8 @@ func (bpm *BpmData) LoadFile(file string) error {
     return nil;
 }
 
-func (bpm *BpmData) Clone(includeModules string) BpmData{
-    newBpm := BpmData{};
+func (bpm *BpmData) Clone(includeModules string) *BpmData {
+    newBpm := &BpmData{};
     newBpm.Name = bpm.Name;
     newBpm.Version = bpm.Version;
     newBpm.Dependencies = make(map[string]BpmDependency);

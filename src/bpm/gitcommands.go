@@ -15,7 +15,7 @@ type GitCommands struct {
 
 
 func (git *GitCommands) HasChanges() bool {
-    stdOut, _, err := git.RunCommand(git.Path, "git diff-index HEAD --")
+    stdOut, err := git.RunCommand(git.Path, "git diff-index HEAD --")
     if err != nil {
         return false;
     }
@@ -30,12 +30,12 @@ func (git *GitCommands) HasChanges() bool {
 //"git rev-list <commitA> | grep $(git rev-parse <commitB>)"
 
 func (git *GitCommands) DetermineAncestor(commit1 string, commit2 string) string {
-    stdOut, _, err := git.RunCommand(git.Path, "git rev-list " + commit1)
+    stdOut, err := git.RunCommand(git.Path, "git rev-list " + commit1)
     if err != nil {
         return "";
     }
     if !strings.Contains(stdOut, commit2) {
-        stdOut, _, err = git.RunCommand(git.Path, "git rev-list " + commit2)
+        stdOut, err = git.RunCommand(git.Path, "git rev-list " + commit2)
         if err != nil {
             return "";
         }
@@ -51,9 +51,9 @@ func (git *GitCommands) DetermineAncestor(commit1 string, commit2 string) string
 
 func (git *GitCommands) GetRemoteUrl(remoteName string) (string, error) {
     gitCommand := "git remote -v"
-    stdOut, stdErr, err := git.RunCommand(git.Path, gitCommand)
+    stdOut, err := git.RunCommand(git.Path, gitCommand)
     if err != nil {
-        return stdErr, err;
+        return "", err;
     }
     re := regexp.MustCompile(remoteName + "\\s(http.*\\.git)\\s")
     matched := re.FindAllStringSubmatch(stdOut, -1)
@@ -68,14 +68,14 @@ func (git *GitCommands) GetRemoteUrl(remoteName string) (string, error) {
 
 func (git *GitCommands) GetLatestCommit() (string, error) {
     gitCommand := "git log --max-count=1 --pretty=format:%H"
-    stdOut, stdErr, err := git.RunCommand(git.Path, gitCommand)
+    stdOut, err := git.RunCommand(git.Path, gitCommand)
     if err != nil {
-        return stdErr, err;
+        return "", err;
     }
     return stdOut, nil;
 }
 
-func (git *GitCommands) RunCommand(dir string, command string) (string, string, error) {
+func (git *GitCommands) RunCommand(dir string, command string) (string, error) {
     cmd := exec.Command("git")
     if dir != "" {
         cmd.Dir = dir;
@@ -87,32 +87,26 @@ func (git *GitCommands) RunCommand(dir string, command string) (string, string, 
 	cmd.Stdout = &out
     cmd.Stderr = &stdErr
 	err := cmd.Run()
+    fmt.Println(out.String())
+    fmt.Println(stdErr.String())
 	if err != nil {
-        fmt.Println(stdErr.String())
-        fmt.Println(out.String())
         fmt.Println(err)
-        return out.String(), stdErr.String(), err;
+        return out.String(), err;
 	}
-    return out.String(), "", nil
+    return out.String(), nil
 }
 
 func (git *GitCommands) Init() error {
     fmt.Println("Initializing empty git repository")
     gitCommand := "git init";
-    _,stdErr, err := git.RunCommand(git.Path, gitCommand);
-    if err != nil {
-        fmt.Println(stdErr)
-    }
+    _, err := git.RunCommand(git.Path, gitCommand);
     return err;
 }
 
 func (git *GitCommands) AddRemote(name string, url string) error {
     fmt.Println("Adding remote", url, "as", name)
     gitCommand := "git remote add " + name + " " + url
-    _,stdErr, err := git.RunCommand(git.Path, gitCommand)
-    if err != nil {
-        fmt.Println(stdErr)
-    }
+    _, err := git.RunCommand(git.Path, gitCommand)
     return err;
 }
 
@@ -127,20 +121,14 @@ func (git *GitCommands) InitAndFetch(url string) error {
     }
     fmt.Println("Fetching...")
     gitCommand := "git fetch --all"
-    _,stdErr,err := git.RunCommand(git.Path, gitCommand);
-    if err != nil {
-        fmt.Println(stdErr)
-    }
+    _, err = git.RunCommand(git.Path, gitCommand);
     return err
 }
 
 func (git *GitCommands) Checkout(commit string) (error) {
     fmt.Println("Checking out commit", commit)
     gitCommand := "git checkout " + commit
-    _,stdErr, err := git.RunCommand(git.Path, gitCommand);
-    if err != nil {
-        fmt.Println(stdErr)
-    }
+    _, err := git.RunCommand(git.Path, gitCommand);
     return err;
 }
 
@@ -153,10 +141,7 @@ func (git *GitCommands) SubmoduleUpdate(init bool, recursive bool) (error) {
     if recursive {
         gitCommand = gitCommand + "--recursive"
     }
-    _, stdErr, err := git.RunCommand(git.Path, gitCommand)
-    if err != nil {
-        fmt.Println(stdErr)
-    }
+    _, err := git.RunCommand(git.Path, gitCommand)
     return err;
 }
 
@@ -176,6 +161,6 @@ func (git *GitCommands) Clone(url string, commit string) error {
     fmt.Println("Cloning", url, "...")
     // git clone <repo url> <destination directory>
     gitCommand := "git clone " + url + " " + commit
-    _,_, err := git.RunCommand(git.Path, gitCommand);
+    _, err := git.RunCommand(git.Path, gitCommand);
     return err;
 }

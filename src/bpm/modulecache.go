@@ -17,16 +17,14 @@ type ModuleCacheItem struct {
 }
 
 type ModuleCache struct {
-    Items map[string]ModuleCacheItem
+    Items map[string]*ModuleCacheItem
 }
 
 func (r *ModuleCache) Delete(item string) {
     delete(r.Items, item)
-    return
 }
 
 func (r *ModuleCache) Install() (error) {
-
     if Options.PackageManager == "npm" {
         return r.NpmInstall()
         return nil;
@@ -141,21 +139,29 @@ func (r *ModuleCache) CopyAndNpmInstall(nodeModulesPath string) (error){
     return nil;
 }
 
-func (r *ModuleCache) Add(item ModuleCacheItem, resolveVersion bool, resolveGitPath string) (bool, error) {
+func (r *ModuleCache) AddLatest(item *ModuleCacheItem) (bool, error) {
     existingItem, exists := r.Items[item.Name];
+    if !exists {
+        return r.Add(item), nil;
+    }
 
-    if exists && resolveVersion && Options.ConflictResolutionType == "revisionlist" {
+    // If the existing cache item is a 'local' item, then the local item always has priority and there is no need to resolve any conflicts
+    if strings.HasSuffix(existingItem.Path, "/" + Options.LocalModuleName) {
+        return false, nil;
+    }
+
+    if Options.ConflictResolutionType == "revisionlist" {
         fmt.Println("Attempting to determine which commit is the ancestor...")
         // If commitB is printed, then commitA is an ancestor of commit B
         //"git rev-list <commitA> | grep $(git rev-parse <commitB>)"
-        git := GitCommands{Path: resolveGitPath}
+        git := GitCommands{Path: item.Path}
         result := git.DetermineAncestor(item.Commit, existingItem.Commit)
         if result == item.Commit {
             fmt.Println("The commit " + item.Commit + " is an ancestor of the existing cache item. Replacing existing item with new item.")
         } else {
             return false, nil
         }
-    } else if exists && resolveVersion && Options.ConflictResolutionType == "versioning" {
+    } else if Options.ConflictResolutionType == "versioning" {
         v1, err := semver.Make(existingItem.Version)
         if err != nil {
             fmt.Println("Error: There was a problem reading the version")
@@ -180,6 +186,10 @@ func (r *ModuleCache) Add(item ModuleCacheItem, resolveVersion bool, resolveGitP
             return false, nil;
         }
     }
+    return r.Add(item), nil
+}
+
+func (r *ModuleCache) Add(item *ModuleCacheItem) (bool) {
     r.Items[item.Name] = item;
-    return true, nil;
+    return true;
 }
