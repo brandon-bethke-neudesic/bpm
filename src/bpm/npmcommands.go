@@ -26,7 +26,6 @@ func (npm *NpmCommands) RunCommand(dir string, command string) error {
     fmt.Println(out.String())
     fmt.Println(errOut.String())
 	if err != nil {
-        fmt.Println(err)
         return err;
 	}
     return nil

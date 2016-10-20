@@ -7,6 +7,7 @@ import (
     "os"
     "path"
     "io/ioutil"
+    "bpmerror"
 )
 
 type ModuleCacheItem struct {
@@ -27,12 +28,10 @@ func (r *ModuleCache) Delete(item string) {
 func (r *ModuleCache) Install() (error) {
     if Options.PackageManager == "npm" {
         return r.NpmInstall()
-        return nil;
     } else if Options.PackageManager == "yarn" {
         return r.CopyAndYarnInstall("./node_modules");
     } else {
-        fmt.Println("Error: Unrecognized package manager", Options.PackageManager)
-        return nil;
+        return bpmerror.New(nil, "Error: Unrecognized package manager " + Options.PackageManager)
     }
 }
 
@@ -47,8 +46,7 @@ func (r *ModuleCache) NpmInstall() (error){
         npm := NpmCommands{Path: workingPath}
         err := npm.InstallUrl(depItem.Path)
         if err != nil {
-            fmt.Println("Error: Failed to npm install module", depName)
-            return err;
+            return bpmerror.New(err, "Error: Failed to npm install module " + depName)
         }
 
     }
@@ -89,17 +87,14 @@ func (r *ModuleCache) CopyAndYarnInstall(nodeModulesPath string) (error) {
         yarn.ParseOptions(os.Args);
         err := yarn.Install()
         if err != nil {
-            fmt.Println("Error: Failed to yarn install module", depName)
-            return err;
+            return bpmerror.New(err, "Error: Failed to yarn install module " + depName)
         }
 
         // Copy the library to the node_modules folder
         copyDir := CopyDir{Exclude:Options.ExcludeFileList}
         err = copyDir.Copy(depItem.Path, nodeModulesItemPath);
         if err != nil {
-            fmt.Println("Error: Failed to copy module to node_modules folder")
-            fmt.Println(err)
-            return err;
+            return bpmerror.New(err, "Error: Failed to copy module to node_modules folder")
         }
     }
     return nil;
@@ -123,17 +118,14 @@ func (r *ModuleCache) CopyAndNpmInstall(nodeModulesPath string) (error){
         copyDir := CopyDir{Exclude:Options.ExcludeFileList}
         err := copyDir.Copy(depItem.Path, nodeModulesItemPath);
         if err != nil {
-            fmt.Println("Error: Failed to copy module to node_modules folder")
-            fmt.Println(err)
-            return err;
+            return bpmerror.New(err, "Error: Failed to copy module to node_modules folder")
         }
 
         // Perform the npm install and pass the url of the dependency. npm install ./node_modules/mydep
         npm := NpmCommands{Path: path.Join(nodeModulesPath, "..")}
         err = npm.InstallUrl(path.Join("./node_modules", depName))
         if err != nil {
-            fmt.Println("Error: Failed to npm install module", depName)
-            return err;
+            return bpmerror.New(err, "Error: Failed to npm install module " + depName)
         }
     }
     return nil;
@@ -164,12 +156,12 @@ func (r *ModuleCache) AddLatest(item *ModuleCacheItem) (bool, error) {
     } else if Options.ConflictResolutionType == "versioning" {
         v1, err := semver.Make(existingItem.Version)
         if err != nil {
-            fmt.Println("Error: There was a problem reading the version")
+            fmt.Println("Warning: There was a problem reading the version")
             return false, nil;
         }
         v2, err := semver.Make(item.Version)
         if err != nil {
-            fmt.Println("Error: There was a problem reading the version")
+            fmt.Println("Warning: There was a problem reading the version")
             return false, nil;
         }
         versionCompareResult := v1.Compare(v2);

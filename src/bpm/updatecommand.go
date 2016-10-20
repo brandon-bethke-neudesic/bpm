@@ -1,11 +1,11 @@
 package main;
 
 import (
-    "errors"
     "fmt"
     "os"
     "path"
     "strings"
+    "bpmerror"
 )
 
 
@@ -28,15 +28,12 @@ func (cmd *UpdateCommand) getUpdateModuleName() (string){
 func (cmd *UpdateCommand) Execute() (error) {
     err := Options.DoesBpmFileExist();
     if err != nil {
-        fmt.Println(err);
         return err;
     }
     bpm := BpmData{};
     err = bpm.LoadFile(Options.BpmFileName);
     if err != nil {
-        fmt.Println("Error: There was a problem loading the bpm file at", Options.BpmFileName)
-        fmt.Println(err);
-        return err;
+        return bpmerror.New(nil, "Error: There was a problem loading the bpm.json file")
     }
     if !bpm.HasDependencies() {
         fmt.Println("There are no dependencies. Done.")
@@ -45,9 +42,7 @@ func (cmd *UpdateCommand) Execute() (error) {
 
     bpmModuleName := cmd.getUpdateModuleName()
     if bpmModuleName != "" && !bpm.HasDependency(bpmModuleName) {
-        msg := "Error: Could not find module " + bpmModuleName + " in the dependencies";
-        fmt.Println(msg)
-        return errors.New(msg)
+        return bpmerror.New(err, "Error: Could not find module " + bpmModuleName + " in the dependencies")
     }
 
     for updateModule, depItem := range bpm.Dependencies {
@@ -60,9 +55,7 @@ func (cmd *UpdateCommand) Execute() (error) {
             fmt.Println("Processing local dependency in", moduleSourceUrl)
             commit, err := DetermineCommitValue(moduleSourceUrl)
             if err != nil {
-                fmt.Println("Error: There was an issue getting the latest commit for", updateModule)
-                fmt.Println(err)
-                return err;
+                return bpmerror.New(err, "Error: There was an issue getting the latest commit for " + updateModule)
             }
             moduleBpm, cacheItem, err := ProcessLocalModule(moduleSourceUrl)
             if err != nil {
@@ -96,15 +89,23 @@ func (cmd *UpdateCommand) Execute() (error) {
             bpm.Dependencies[updateModule] = newItem;
         }
     }
-    moduleCache.Trim();
+    err = moduleCache.Trim();
+    if err != nil {
+        return err;
+    }
     if !Options.SkipNpmInstall {
         err = moduleCache.Install()
         if err != nil {
-            fmt.Println("Error: There was an issue performing npm install on the dependencies")
-            return err;
+            return bpmerror.New(err, "Error: There was an issue performing npm install on the dependencies")
         }
     }
-    bpm.IncrementVersion();
-    bpm.WriteFile(path.Join(workingPath, Options.BpmFileName));
+    err = bpm.IncrementVersion();
+    if err != nil {
+        return err;
+    }
+    err = bpm.WriteFile(path.Join(workingPath, Options.BpmFileName));
+    if err != nil {
+        return err;
+    }
     return nil;
 }

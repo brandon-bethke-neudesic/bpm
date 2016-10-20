@@ -6,7 +6,7 @@ import (
     "github.com/blang/semver"
     "fmt"
     "strings"
-    "errors"
+    "bpmerror"
 )
 /*
 {
@@ -32,10 +32,10 @@ type BpmDependency struct {
 
 func (dep *BpmDependency) Validate() (error) {
     if strings.TrimSpace(dep.Url) == "" {
-        return errors.New("Error: No url specified")
+        return bpmerror.New(nil, "Error: No url specified")
     }
     if strings.TrimSpace(dep.Commit) == "" {
-        return errors.New("Error: No commit specified")
+        return bpmerror.New(nil, "Error: No commit specified")
     }
     return nil
 }
@@ -56,8 +56,7 @@ type BpmData struct {
 func (bpm *BpmData) IncrementVersion() (error){
     bpmVersion, err := semver.Make(bpm.Version);
     if err != nil {
-        fmt.Println("Error: Could not read the version field from the bpm file");
-        return err;
+        return bpmerror.New(nil, "Error: Could not read the version field from the bpm file")
     }
     bpmVersion.Patch++;
     bpm.Version = bpmVersion.String();
@@ -86,26 +85,23 @@ func (bpm *BpmData) String() string {
 func (bpm *BpmData) WriteFile(file string) error {
     bytes, err := json.MarshalIndent(bpm, "", "   ")
     if err != nil {
-        fmt.Println(err)
         return err;
     }
 
     err = ioutil.WriteFile(file, bytes, 0666);
     if err != nil {
-        fmt.Println("Error: There was an issue writing the file", file)
-        fmt.Println(err)
-        return err;
+        return bpmerror.New(err, "Error: There was an issue writing the file " + file)
     }
     return nil;
 }
 
 func (bpm *BpmData) Validate() error {
     if strings.TrimSpace(bpm.Name) == "" {
-        return errors.New("Error: There must be a name field in the bpm")
+        return bpmerror.New(nil, "Error: There must be a name field in the bpm.json file")
     }
 
     if strings.TrimSpace(bpm.Version) == "" {
-        return errors.New("Error: There must be a version field in the bpm")
+        return bpmerror.New(nil, "Error: There must be a version field in the bpm.json file")
     }
     return nil;
 }

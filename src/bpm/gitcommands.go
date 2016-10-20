@@ -90,7 +90,6 @@ func (git *GitCommands) RunCommand(dir string, command string) (string, error) {
     fmt.Println(out.String())
     fmt.Println(stdErr.String())
 	if err != nil {
-        fmt.Println(err)
         return out.String(), err;
 	}
     return out.String(), nil

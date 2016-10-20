@@ -5,6 +5,7 @@ import (
     "fmt"
     "strings"
     "path"
+    "bpmerror"
 )
 
 
@@ -19,20 +20,16 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
     bpm := BpmData{};
     err := Options.DoesBpmFileExist();
     if err != nil {
-        fmt.Println(err);
         return err;
     }
     err = bpm.LoadFile(Options.BpmFileName);
     if err != nil {
-        fmt.Println("Error: There was a problem loading the bpm file at", Options.BpmFileName)
-        fmt.Println(err);
-        return err;
+        return bpmerror.New(err, "Error: There was a problem loading the bpm.json file")
     }
     Options.EnsureBpmCacheFolder();
 
     itemRemoteUrl, err := MakeRemoteUrl(moduleUrl);
     if err != nil {
-        fmt.Println(err)
         return err;
     }
     var moduleBpm *BpmData;
@@ -69,21 +66,17 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
 func (cmd *InstallCommand) build(installItem string) (error) {
     err := Options.DoesBpmFileExist();
     if err != nil {
-        fmt.Println(err);
         return err;
     }
     fmt.Println("Reading",Options.BpmFileName,"...")
     bpm := BpmData{}
     err = bpm.LoadFile(Options.BpmFileName);
     if err != nil {
-        fmt.Println("Error: There was a problem loading the bpm file at", Options.BpmFileName)
-        fmt.Println(err);
-        return err;
+        return bpmerror.New(err, "Error: There was a problem loading the bpm.json file")
     }
     fmt.Println("Validating bpm.json")
     err = bpm.Validate();
     if err != nil {
-        fmt.Println(err);
         return err;
     }
     if !bpm.HasDependencies() {

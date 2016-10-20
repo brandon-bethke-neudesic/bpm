@@ -3,8 +3,8 @@ package main;
 import (
     "fmt"
     "path"
-    "errors"
     "os"
+    "bpmerror"
 )
 
 type InitCommand struct {
@@ -17,9 +17,7 @@ func (cmd *InitCommand) Name() string {
 func (cmd *InitCommand) Execute() (error) {
     index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "init" });
     if len(os.Args) <= index + 1 {
-        msg := "Error: incorrect usage. module name must be specified";
-        fmt.Println(msg)
-        return errors.New(msg)
+        return bpmerror.New(nil, "Error: incorrect usage. module name must be specified")
     }
     bpmModuleName := os.Args[index + 1];
     bpm := BpmData{Name:bpmModuleName, Version:"1.0.0", Dependencies:make(map[string]BpmDependency)};

@@ -6,6 +6,7 @@ import (
     "path"
     "strings"
     "sort"
+    "bpmerror"
 )
 
 type LsCommand struct {
@@ -100,16 +101,13 @@ func (cmd *LsCommand) Execute() (error) {
     cmd.LocalPath = Options.UseLocal;
     err := Options.DoesBpmFileExist();
     if err != nil {
-        fmt.Println(err);
         return err;
     }
 
     bpm := BpmData{};
     err = bpm.LoadFile(Options.BpmFileName);
     if err != nil {
-        fmt.Println("Error: There was a problem loading the bpm file at", Options.BpmFileName)
-        fmt.Println(err);
-        return err;
+        return bpmerror.New(err, "Error: There was a problem loading the bpm.json file")
     }
     if !bpm.HasDependencies() {
         fmt.Println("There are no dependencies. Done.")

@@ -7,8 +7,8 @@ import (
     "path"
     "net/url"
     "strings"
-    "errors"
     "github.com/blang/semver"
+    "bpmerror"
 )
 
 var moduleCache = ModuleCache{Items:make(map[string]*ModuleCacheItem)};
@@ -42,9 +42,7 @@ func ProcessLocalModule(source string) (*BpmData, *ModuleCacheItem, error) {
     moduleBpmFilePath := path.Join(source, Options.BpmFileName);
     err := moduleBpm.LoadFile(moduleBpmFilePath);
     if err != nil {
-        fmt.Println("Error: Could not load the bpm.json file for dependency", source)
-        fmt.Println(err);
-        return nil, nil, err
+        return nil, nil, bpmerror.New(err, "Error: Could not load the bpm.json file for dependency " + source)
     }
     itemPath := path.Join(Options.BpmCachePath, moduleBpm.Name, Options.LocalModuleName);
     // Clean out the destination directory and then copy the files from the source directory to the final location in the bpm cache.
@@ -53,9 +51,7 @@ func ProcessLocalModule(source string) (*BpmData, *ModuleCacheItem, error) {
     copyDir := CopyDir{Exclude:Options.ExcludeFileList}
     err = copyDir.Copy(source, itemPath);
     if err != nil {
-        fmt.Println("Error: There was an issue trying to copy the local folder to the bpm_cache for", source)
-        fmt.Println(err)
-        return nil, nil, err;
+        return nil, nil, bpmerror.New(err, "Error: There was an issue trying to copy the local folder to the bpm_cache for " + source)
     }
     cacheItem := &ModuleCacheItem{Name:moduleBpm.Name, Path: itemPath}
     return moduleBpm, cacheItem, nil
@@ -70,21 +66,17 @@ func ProcessRemoteModule(itemRemoteUrl string, moduleCommit string) (*BpmData, *
     git := GitCommands{Path:itemPathTemp}
     err := git.InitAndCheckout(itemRemoteUrl, moduleCommit)
     if err != nil {
-        fmt.Println("Error: There was an issue initializing the repository for dependency", moduleBpm.Name, "Url:", itemRemoteUrl, "Commit:", moduleCommit)
-        return nil, nil, err;
+        return nil, nil, bpmerror.New(err, "Error: There was an issue initializing the repository for dependency " + moduleBpm.Name + " Url: " + itemRemoteUrl + " Commit: " + moduleCommit)
     }
     moduleBpmFilePath := path.Join(itemPathTemp, Options.BpmFileName);
     err = moduleBpm.LoadFile(moduleBpmFilePath);
     if err != nil {
-        fmt.Println("Error: Could not load the bpm.json file for dependency at", moduleBpmFilePath)
-        fmt.Println(err);
-        return nil, nil, err;
+        return nil, nil, bpmerror.New(err, "Error: Could not load the bpm.json file for dependency at " + moduleBpmFilePath)
     }
 
     if moduleCommit == "master" {
         moduleCommit, err = git.GetLatestCommit()
         if err != nil {
-            fmt.Println(err)
             return nil, nil, err;
         }
     }
@@ -95,7 +87,6 @@ func ProcessRemoteModule(itemRemoteUrl string, moduleCommit string) (*BpmData, *
     copyDir := CopyDir{/*Exclude:Options.ExcludeFileList*/}
     err = copyDir.Copy(itemPathTemp, itemPath);
     if err != nil {
-        fmt.Println(err)
         return nil, nil, err;
     }
 
@@ -132,21 +123,17 @@ func MakeRemoteUrl(itemUrl string) (string, error) {
         var err error;
         adjustedUrl, err = git.GetRemoteUrl(Options.UseRemote)
         if err != nil {
-            fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
-            return "", err
+            return "", bpmerror.New(err, "Error: There was a problem getting the remote url " + Options.UseRemote)
         }
     } else if strings.Index(adjustedUrl, "http") != 0 {
         git := GitCommands{Path:workingPath}
         remoteUrl, err := git.GetRemoteUrl(Options.UseRemote)
         if err != nil {
-            fmt.Println("Error: There was a problem getting the remote url", Options.UseRemote)
-            return "", err;
+            return "", bpmerror.New(err, "Error: There was a problem getting the remote url " + Options.UseRemote)
         }
         parsedUrl, err := url.Parse(remoteUrl)
         if err != nil {
-            fmt.Println("Error: There was a problem parsing the remote url", remoteUrl)
-            fmt.Println(err);
-            return "", err;
+            return "", bpmerror.New(err, "Error: There was a problem parsing the remote url " + remoteUrl)
         }
         adjustedUrl = parsedUrl.Scheme + "://" + path.Join(parsedUrl.Host, parsedUrl.Path, itemUrl)
     }
@@ -158,7 +145,6 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
         fmt.Println("Validating dependency", itemName)
         err := item.Validate();
         if err != nil {
-            fmt.Println(err);
             return err;
         }
         if Options.UseLocal != "" && strings.Index(item.Url, "http") == -1 {
@@ -167,9 +153,7 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
             fmt.Println("Processing local dependency in", moduleSourceUrl)
             commit, err := DetermineCommitValue(moduleSourceUrl)
             if err != nil {
-                fmt.Println("Error: There was an issue getting the latest commit for", itemName)
-                fmt.Println(err)
-                return err;
+                return bpmerror.New(err, "Error: There was an issue getting the latest commit for " + itemName)
             }
             moduleBpm, cacheItem, err := ProcessLocalModule(moduleSourceUrl)
             if err != nil {
@@ -189,8 +173,14 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
             bpm.Dependencies[itemName] = newItem;
             if Options.Command.Name() == "update" && Options.Recursive && bpmUpdated {
                 filePath := path.Join(Options.UseLocal, bpm.Name, Options.BpmFileName);
-                bpm.IncrementVersion();
-                bpm.WriteFile(filePath)
+                err = bpm.IncrementVersion();
+                if err != nil {
+                    return err;
+                }
+                err = bpm.WriteFile(filePath)
+                if err != nil {
+                    return err;
+                }
             }
         } else {
             fmt.Println("Processing dependency", itemName)
@@ -208,11 +198,12 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
                 fmt.Println("Could not find module", itemName, "in the bpm cache. Cloning repository...")
                 var err error;
                 parentUrl, err = MakeRemoteUrl(parentUrl);
+                if err != nil {
+                    return err;
+                }
                 tempUrl, err := url.Parse(parentUrl)
                 if err != nil {
-                    fmt.Println("Error: There is something wrong with the module url", parentUrl)
-                    fmt.Println(err);
-                    return err;
+                    return bpmerror.New(err, "Error: There is something wrong with the module url " + parentUrl)
                 }
                 // If the item URL is a relative URL, then make a full URL using the parent url as the root.
                 if strings.Index(item.Url, "http") != 0 {
@@ -222,9 +213,8 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
                 git := GitCommands{Path: itemClonePath}
                 err = git.InitAndCheckout(itemRemoteUrl, item.Commit)
                 if err != nil {
-                    msg := "Error: There was an issue initializing the repository for dependency " + itemName + " Url: " + itemRemoteUrl + " Commit: " + item.Commit
                     os.RemoveAll(itemClonePath)
-                    return errors.New(msg)
+                    return bpmerror.New(nil, "Error: There was an issue initializing the repository for dependency " + itemName + " Url: " + itemRemoteUrl + " Commit: " + item.Commit)
                 }
             } else {
                 fmt.Println("Module", itemName, "already exists in the bpm cache.")
@@ -234,15 +224,12 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
             moduleBpmFilePath := path.Join(itemClonePath, Options.BpmFileName)
             err := moduleBpm.LoadFile(moduleBpmFilePath);
             if err != nil {
-                fmt.Println("Error: Could not load the bpm.json file for dependency", itemName)
-                fmt.Println(err);
-                return err;
+                return bpmerror.New(err, "Error: Could not load the bpm.json file for dependency " + itemName)
             }
 
             fmt.Println("Validating bpm.json for", itemName)
             err = moduleBpm.Validate();
             if err != nil {
-                fmt.Println(err)
                 return err;
             }
             cacheItem := &ModuleCacheItem{Name:moduleBpm.Name, Version: moduleBpm.Version, Commit: item.Commit, Path: itemClonePath}
@@ -264,6 +251,7 @@ func main() {
     Options.ParseOptions(os.Args);
     err := Options.Command.Execute();
     if err != nil {
+        fmt.Println(err)
         fmt.Println("Finished with errors")
         os.Exit(1)
     }
