@@ -10,13 +10,6 @@ import (
     "bpmerror"
 )
 
-type ModuleCacheItem struct {
-    Name string
-    Version string
-    Commit string
-    Path string
-}
-
 type ModuleCache struct {
     Items map[string]*ModuleCacheItem
 }
