@@ -54,7 +54,7 @@ func (cmd *UninstallCommand) Execute() (error) {
 
     delete(bpm.Dependencies, uninstallModuleName)
     workingPath,_ := os.Getwd();
-    npm := NpmCommands{Path: workingPath}
+    npm := NpmExec{Path: workingPath}
     err = npm.Uninstall(uninstallModuleName)
     if err != nil {
         return bpmerror.New(err, "Error: Failed to npm uninstall module " + uninstallModuleName)

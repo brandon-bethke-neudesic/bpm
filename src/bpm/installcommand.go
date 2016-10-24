@@ -41,12 +41,11 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         return err;
     }
     moduleCache.AddLatest(cacheItem)
-    err = ProcessDependencies(moduleBpm, itemRemoteUrl)
+    err = ProcessDependencies(moduleBpm, itemRemoteUrl, nil)
     if err != nil {
         return err;
     }
     moduleCache.Trim();
-
     if !Options.SkipNpmInstall{
         err := moduleCache.Install()
         if err != nil {
@@ -54,12 +53,17 @@ func (cmd *InstallCommand) installNew(moduleUrl string, moduleCommit string) (er
         }
     }
 
-    newItem := BpmDependency{Url:moduleUrl, Commit:cacheItem.Commit};
+    newItem := &BpmDependency{Url:moduleUrl, Commit:cacheItem.Commit};
     bpm.Dependencies[moduleBpm.Name] = newItem;
 
-    bpm.IncrementVersion();
-    bpm.WriteFile(path.Join(workingPath, Options.BpmFileName))
-
+    err = bpm.IncrementVersion();
+    if err != nil {
+        return err;
+    }
+    err = bpm.WriteFile(path.Join(Options.WorkingDir, Options.BpmFileName))
+    if err != nil {
+        return err;
+    }
     return nil;
 }
 
@@ -86,7 +90,7 @@ func (cmd *InstallCommand) build(installItem string) (error) {
     Options.EnsureBpmCacheFolder();
     newBpm := bpm.Clone(installItem);
     fmt.Println("Processing all dependencies for", bpm.Name, "version", bpm.Version);
-    err = ProcessDependencies(newBpm, "")
+    err = ProcessDependencies(newBpm, "", nil)
     if err != nil {
         return err;
     }

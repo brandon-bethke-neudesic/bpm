@@ -40,7 +40,11 @@ func (dep *BpmDependency) Validate() (error) {
     return nil
 }
 
-func (dep *BpmDependency) Equal(item BpmDependency) bool {
+func (dep *BpmDependency) Equal(item *BpmDependency) bool {
+    // If the address is the same, then it's equal.
+    if dep == item {
+        return true;
+    }
     if item.Commit == dep.Commit && item.Url == dep.Url {
         return true;
     }
@@ -50,7 +54,7 @@ func (dep *BpmDependency) Equal(item BpmDependency) bool {
 type BpmData struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
-    Dependencies map[string]BpmDependency `json:"dependencies"`
+    Dependencies map[string]*BpmDependency `json:"dependencies"`
 }
 
 func (bpm *BpmData) IncrementVersion() (error){
@@ -126,7 +130,7 @@ func (bpm *BpmData) Clone(includeModules string) *BpmData {
     newBpm := &BpmData{};
     newBpm.Name = bpm.Name;
     newBpm.Version = bpm.Version;
-    newBpm.Dependencies = make(map[string]BpmDependency);
+    newBpm.Dependencies = make(map[string]*BpmDependency);
     for name, v := range bpm.Dependencies {
         newBpm.Dependencies[name] = v
     }

@@ -25,6 +25,49 @@ func (cmd *UpdateCommand) getUpdateModuleName() (string){
     return "";
 }
 
+func DetermineLocalCommitValue(source string) (string, error) {
+    // Put the commit as local, since we don't really know what it should be.
+    // It's expected that the bpm install will fail if the commit is 'local' which will indicate to the user that they
+    // didn't finalize configuring the dependency
+    // However if the repo has no changes, then grab the commit
+    commit := "local"
+    git := GitExec{Path:source}
+    if Options.Finalize || !git.HasChanges() {
+        var err error;
+        commit, err = git.GetLatestCommit()
+        if err != nil {
+            return "", err;
+        }
+    }
+    return commit, nil
+}
+
+func updateLocalBpm(bpm *BpmData, moduleSourceUrl string, itemName string, item *BpmDependency) error {
+    // Only update and save the bpm if the recursive option is set.
+    if !Options.Recursive {
+        return nil;
+    }
+    commit, err := DetermineLocalCommitValue(moduleSourceUrl)
+    if err != nil {
+        return bpmerror.New(err, "Error: There was an issue getting the latest commit for " + itemName)
+    }
+    newItem := &BpmDependency{Url: item.Url, Commit:commit}
+    existingItem := bpm.Dependencies[itemName];
+    if !existingItem.Equal(newItem) {
+        bpm.Dependencies[itemName] = newItem;
+        filePath := path.Join(Options.UseLocal, bpm.Name, Options.BpmFileName);
+        err = bpm.IncrementVersion();
+        if err != nil {
+            return err;
+        }
+        err = bpm.WriteFile(filePath)
+        if err != nil {
+            return err;
+        }
+    }
+    return nil;
+}
+
 func (cmd *UpdateCommand) Execute() (error) {
     err := Options.DoesBpmFileExist();
     if err != nil {
@@ -53,7 +96,7 @@ func (cmd *UpdateCommand) Execute() (error) {
         if Options.UseLocal != "" && strings.Index(depItem.Url, "http") == -1 {
             moduleSourceUrl := path.Join(Options.UseLocal, updateModule);
             fmt.Println("Processing local dependency in", moduleSourceUrl)
-            commit, err := DetermineCommitValue(moduleSourceUrl)
+            commit, err := DetermineLocalCommitValue(moduleSourceUrl)
             if err != nil {
                 return bpmerror.New(err, "Error: There was an issue getting the latest commit for " + updateModule)
             }
@@ -62,12 +105,12 @@ func (cmd *UpdateCommand) Execute() (error) {
                 return err;
             }
             moduleCache.Add(cacheItem)
-            err = ProcessDependencies(moduleBpm, "")
+            err = ProcessDependencies(moduleBpm, "", updateLocalBpm)
             if err != nil {
                 return err;
             }
 
-            newItem := BpmDependency{Url: depItem.Url, Commit:commit}
+            newItem := &BpmDependency{Url: depItem.Url, Commit:commit}
             bpm.Dependencies[updateModule] = newItem;
 
         } else {
@@ -81,18 +124,15 @@ func (cmd *UpdateCommand) Execute() (error) {
                 return err;
             }
             moduleCache.Add(cacheItem)
-            err = ProcessDependencies(moduleBpm, itemRemoteUrl)
+            err = ProcessDependencies(moduleBpm, itemRemoteUrl, nil)
             if err != nil {
                 return err;
             }
-            newItem := BpmDependency{Url: depItem.Url, Commit:cacheItem.Commit}
+            newItem := &BpmDependency{Url: depItem.Url, Commit:cacheItem.Commit}
             bpm.Dependencies[updateModule] = newItem;
         }
     }
-    err = moduleCache.Trim();
-    if err != nil {
-        return err;
-    }
+    moduleCache.Trim();
     if !Options.SkipNpmInstall {
         err = moduleCache.Install()
         if err != nil {
@@ -103,7 +143,7 @@ func (cmd *UpdateCommand) Execute() (error) {
     if err != nil {
         return err;
     }
-    err = bpm.WriteFile(path.Join(workingPath, Options.BpmFileName));
+    err = bpm.WriteFile(path.Join(Options.WorkingDir, Options.BpmFileName));
     if err != nil {
         return err;
     }

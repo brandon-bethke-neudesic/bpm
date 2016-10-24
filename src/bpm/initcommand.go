@@ -20,11 +20,12 @@ func (cmd *InitCommand) Execute() (error) {
         return bpmerror.New(nil, "Error: incorrect usage. module name must be specified")
     }
     bpmModuleName := os.Args[index + 1];
-    bpm := BpmData{Name:bpmModuleName, Version:"1.0.0", Dependencies:make(map[string]BpmDependency)};
-    err := bpm.WriteFile(path.Join(workingPath,Options.BpmFileName))
-    if err == nil {
-        fmt.Println("Created bpm file: ")
-        fmt.Println(bpm.String())
+    bpm := BpmData{Name:bpmModuleName, Version:"1.0.0", Dependencies:make(map[string]*BpmDependency)};
+    err := bpm.WriteFile(path.Join(Options.WorkingDir, Options.BpmFileName))
+    if err != nil {
+        return err;
     }
+    fmt.Println("Created bpm file: ")
+    fmt.Println(bpm.String())
     return nil;
 }

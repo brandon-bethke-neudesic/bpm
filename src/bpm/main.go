@@ -12,7 +12,6 @@ import (
 )
 
 var moduleCache = ModuleCache{Items:make(map[string]*ModuleCacheItem)};
-var workingPath = "";
 var Options = BpmOptions {
     BpmCachePath: "bpm_modules",
     BpmFileName: "bpm.json",
@@ -58,12 +57,12 @@ func ProcessLocalModule(source string) (*BpmData, *ModuleCacheItem, error) {
 }
 
 func ProcessRemoteModule(itemRemoteUrl string, moduleCommit string) (*BpmData, *ModuleCacheItem, error) {
-    itemPathTemp := path.Join(workingPath, Options.BpmCachePath, "xx_temp_xx", "xx_temp_xx")
+    itemPathTemp := path.Join(Options.WorkingDir, Options.BpmCachePath, "xx_temp_xx", "xx_temp_xx")
     defer os.RemoveAll(path.Join(itemPathTemp, ".."))
     os.RemoveAll(path.Join(itemPathTemp));
     os.MkdirAll(itemPathTemp, 0777)
     moduleBpm := &BpmData{};
-    git := GitCommands{Path:itemPathTemp}
+    git := GitExec{Path:itemPathTemp}
     err := git.InitAndCheckout(itemRemoteUrl, moduleCommit)
     if err != nil {
         return nil, nil, bpmerror.New(err, "Error: There was an issue initializing the repository for dependency " + moduleBpm.Name + " Url: " + itemRemoteUrl + " Commit: " + moduleCommit)
@@ -99,34 +98,17 @@ func ProcessRemoteModule(itemRemoteUrl string, moduleCommit string) (*BpmData, *
     return moduleBpm, cacheItem, nil;
 }
 
-func DetermineCommitValue(source string) (string, error) {
-    // Put the commit as local, since we don't really know what it should be.
-    // It's expected that the bpm install will fail if the commit is 'local' which will indicate to the user that they
-    // didn't finalize configuring the dependency
-    // However if the repo has no changes, then grab the commit
-    commit := "local"
-    git := GitCommands{Path:source}
-    if Options.Command.Name() == "update" && (Options.Finalize || !git.HasChanges()) {
-        var err error;
-        commit, err = git.GetLatestCommit()
-        if err != nil {
-            return "", err;
-        }
-    }
-    return commit, nil
-}
-
 func MakeRemoteUrl(itemUrl string) (string, error) {
     adjustedUrl := itemUrl;
     if adjustedUrl == "" {
-        git := GitCommands{Path:workingPath}
+        git := GitExec{Path:Options.WorkingDir}
         var err error;
         adjustedUrl, err = git.GetRemoteUrl(Options.UseRemote)
         if err != nil {
             return "", bpmerror.New(err, "Error: There was a problem getting the remote url " + Options.UseRemote)
         }
     } else if strings.Index(adjustedUrl, "http") != 0 {
-        git := GitCommands{Path:workingPath}
+        git := GitExec{Path:Options.WorkingDir}
         remoteUrl, err := git.GetRemoteUrl(Options.UseRemote)
         if err != nil {
             return "", bpmerror.New(err, "Error: There was a problem getting the remote url " + Options.UseRemote)
@@ -140,7 +122,9 @@ func MakeRemoteUrl(itemUrl string) (string, error) {
     return adjustedUrl, nil;
 }
 
-func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
+type LocalItemProcessed func(bpm *BpmData, moduleSourceUrl string, itemName string, item *BpmDependency) error;
+
+func ProcessDependencies(bpm *BpmData, parentUrl string, localItemProcessed LocalItemProcessed) (error) {
     for itemName, item := range bpm.Dependencies {
         fmt.Println("Validating dependency", itemName)
         err := item.Validate();
@@ -148,40 +132,25 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
             return err;
         }
         if Options.UseLocal != "" && strings.Index(item.Url, "http") == -1 {
-            bpmUpdated := false
             moduleSourceUrl := path.Join(Options.UseLocal, itemName);
             fmt.Println("Processing local dependency in", moduleSourceUrl)
-            commit, err := DetermineCommitValue(moduleSourceUrl)
-            if err != nil {
-                return bpmerror.New(err, "Error: There was an issue getting the latest commit for " + itemName)
-            }
             moduleBpm, cacheItem, err := ProcessLocalModule(moduleSourceUrl)
             if err != nil {
                 return err;
             }
             moduleCache.Add(cacheItem)
-            err = ProcessDependencies(moduleBpm, "")
+            err = ProcessDependencies(moduleBpm, "", localItemProcessed)
             if err != nil {
                 return err;
             }
 
-            newItem := BpmDependency{Url: item.Url, Commit:commit}
-            existingItem := bpm.Dependencies[itemName];
-            if !existingItem.Equal(newItem) {
-                bpmUpdated = true;
-            }
-            bpm.Dependencies[itemName] = newItem;
-            if Options.Command.Name() == "update" && Options.Recursive && bpmUpdated {
-                filePath := path.Join(Options.UseLocal, bpm.Name, Options.BpmFileName);
-                err = bpm.IncrementVersion();
-                if err != nil {
-                    return err;
-                }
-                err = bpm.WriteFile(filePath)
+            if localItemProcessed != nil {
+                err = localItemProcessed(bpm, moduleSourceUrl, itemName, item)
                 if err != nil {
                     return err;
                 }
             }
+
         } else {
             fmt.Println("Processing dependency", itemName)
 
@@ -189,7 +158,7 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
             os.Mkdir(itemPath, 0777)
 
             itemRemoteUrl := item.Url;
-            itemClonePath := path.Join(workingPath, itemPath, item.Commit)
+            itemClonePath := path.Join(Options.WorkingDir, itemPath, item.Commit)
             localPath := path.Join(Options.BpmCachePath, itemName, Options.LocalModuleName)
             if PathExists(localPath) {
                 fmt.Println("Found local folder in the bpm modules. Using this folder", localPath)
@@ -210,7 +179,7 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
                     itemRemoteUrl = tempUrl.Scheme + "://" + path.Join(tempUrl.Host, tempUrl.Path, item.Url)
                 }
                 os.Mkdir(itemClonePath, 0777)
-                git := GitCommands{Path: itemClonePath}
+                git := GitExec{Path: itemClonePath}
                 err = git.InitAndCheckout(itemRemoteUrl, item.Commit)
                 if err != nil {
                     os.RemoveAll(itemClonePath)
@@ -237,7 +206,7 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
             moduleCache.AddLatest(cacheItem)
 
             fmt.Println("Processing all dependencies for", moduleBpm.Name, "version", moduleBpm.Version);
-            err = ProcessDependencies(moduleBpm, itemRemoteUrl)
+            err = ProcessDependencies(moduleBpm, itemRemoteUrl, nil)
             if err != nil {
                 return err;
             }
@@ -247,8 +216,7 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
 }
 
 func main() {
-    workingPath,_ = os.Getwd();
-    Options.ParseOptions(os.Args);
+    Options.Parse(os.Args);
     err := Options.Command.Execute();
     if err != nil {
         fmt.Println(err)

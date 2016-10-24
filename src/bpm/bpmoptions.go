@@ -21,6 +21,7 @@ type BpmOptions struct {
     SkipNpmInstall bool
     Finalize bool
     PackageManager string
+    WorkingDir string
     Command SubCommand
 }
 
@@ -70,15 +71,16 @@ func (options *BpmOptions) getSubCommand(args []string) (SubCommand){
 }
 
 
-func (options *BpmOptions) ParseOptions(args []string) {
+func (options *BpmOptions) Parse(args []string) {
     options.Command = options.getSubCommand(args)
-    options.SkipNpmInstall = options.GetFlagOption(args, "--skipnpm")
-    options.Recursive = options.GetFlagOption(args, "--recursive")
+    options.SkipNpmInstall = options.GetBoolOption(args, "--skipnpm")
+    options.Recursive = options.GetBoolOption(args, "--recursive")
     options.ConflictResolutionType = options.GetNameValueOption(args, "--resolution=", "versioning")
     options.UseRemote = options.GetNameValueOption(args, "--remote=", "origin")
     options.UseLocal = options.GetRootOption(args);
-    options.Finalize = options.GetFlagOption(args, "--finalize")
+    options.Finalize = options.GetBoolOption(args, "--finalize")
     options.PackageManager = options.GetNameValueOption(args, "--pkgm=", "npm")
+    options.WorkingDir, _ = os.Getwd();
 }
 
 func (options *BpmOptions) GetNameValueOption(args []string, name string, defaultValue string) (string) {
@@ -94,7 +96,7 @@ func (options *BpmOptions) GetNameValueOption(args []string, name string, defaul
     return flagValue;
 }
 
-func (options *BpmOptions) GetFlagOption(args []string, name string) (bool) {
+func (options *BpmOptions) GetBoolOption(args []string, name string) (bool) {
     index := SliceIndex(len(args), func(i int) bool { return strings.Index(args[i], name) == 0 });
     if index == -1 {
         return false;
@@ -105,7 +107,7 @@ func (options *BpmOptions) GetFlagOption(args []string, name string) (bool) {
 func (options *BpmOptions) GetRootOption(args []string) string{
     root := options.GetNameValueOption(args, "--root=", "")
     if strings.Index(root, ".") == 0 || strings.Index(root, "..") == 0 {
-        root = path.Join(workingPath, root)
+        root = path.Join(options.WorkingDir, root)
     }
     return root
 }

@@ -38,12 +38,12 @@ func (r *ModuleCache) Install() (error) {
 func (r *ModuleCache) NpmInstall() (error){
     fmt.Println("Npm installing dependencies to node_modules...")
     workingPath,_ := os.Getwd();
+    npm := NpmExec{Path: workingPath}
     // Go through each item in the bpm memory cache. There is suppose to only be one item per dependency
     for depName := range r.Items {
         fmt.Println("Processing cached dependency", depName)
         depItem := r.Items[depName];
         // Perform the npm install and pass the url of the dependency. npm install ./bpm_modules/mydep
-        npm := NpmCommands{Path: workingPath}
         err := npm.InstallUrl(depItem.Path)
         if err != nil {
             return bpmerror.New(err, "Error: Failed to npm install module " + depName)
@@ -53,7 +53,7 @@ func (r *ModuleCache) NpmInstall() (error){
     return nil;
 }
 
-func (r *ModuleCache) Trim() (error) {
+func (r *ModuleCache) Trim() {
     for depName := range r.Items {
         depItem := r.Items[depName];
         // Delete previous cached items
@@ -65,7 +65,6 @@ func (r *ModuleCache) Trim() (error) {
             }
         }
     }
-    return nil
 }
 
 func (r *ModuleCache) CopyAndYarnInstall(nodeModulesPath string) (error) {
@@ -74,6 +73,9 @@ func (r *ModuleCache) CopyAndYarnInstall(nodeModulesPath string) (error) {
         fmt.Println("node_modules folder not found. Creating it...")
         os.Mkdir(nodeModulesPath, 0777)
     }
+
+    yarn := YarnExec{}
+    yarn.ParseOptions(os.Args);
     // Go through each item in the bpm memory cache. There is suppose to only be one item per dependency
     for depName := range r.Items {
         fmt.Println("Processing cached dependency", depName)
@@ -83,8 +85,7 @@ func (r *ModuleCache) CopyAndYarnInstall(nodeModulesPath string) (error) {
         os.RemoveAll(nodeModulesItemPath);
 
         // Perform the yarn install
-        yarn := YarnCommands{Path: depItem.Path}
-        yarn.ParseOptions(os.Args);
+        yarn.Path = depItem.Path;
         err := yarn.Install()
         if err != nil {
             return bpmerror.New(err, "Error: Failed to yarn install module " + depName)
@@ -106,6 +107,7 @@ func (r *ModuleCache) CopyAndNpmInstall(nodeModulesPath string) (error){
         fmt.Println("node_modules folder not found. Creating it...")
         os.Mkdir(nodeModulesPath, 0777)
     }
+    npm := NpmExec{Path: path.Join(nodeModulesPath, "..")}
     // Go through each item in the bpm memory cache. There is suppose to only be one item per dependency
     for depName := range r.Items {
         fmt.Println("Processing cached dependency", depName)
@@ -122,7 +124,6 @@ func (r *ModuleCache) CopyAndNpmInstall(nodeModulesPath string) (error){
         }
 
         // Perform the npm install and pass the url of the dependency. npm install ./node_modules/mydep
-        npm := NpmCommands{Path: path.Join(nodeModulesPath, "..")}
         err = npm.InstallUrl(path.Join("./node_modules", depName))
         if err != nil {
             return bpmerror.New(err, "Error: Failed to npm install module " + depName)
@@ -146,7 +147,7 @@ func (r *ModuleCache) AddLatest(item *ModuleCacheItem) (bool, error) {
         fmt.Println("Attempting to determine which commit is the ancestor...")
         // If commitB is printed, then commitA is an ancestor of commit B
         //"git rev-list <commitA> | grep $(git rev-parse <commitB>)"
-        git := GitCommands{Path: item.Path}
+        git := GitExec{Path: item.Path}
         result := git.DetermineAncestor(item.Commit, existingItem.Commit)
         if result == item.Commit {
             fmt.Println("The commit " + item.Commit + " is an ancestor of the existing cache item. Replacing existing item with new item.")
