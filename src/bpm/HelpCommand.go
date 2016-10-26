@@ -113,6 +113,14 @@ func (help *HelpCommand) Execute() (error){
     fmt.Println("");
     fmt.Println("Other Options")
     fmt.Println("");
+    fmt.Println("    --remoteurl=");
+    fmt.Println("");
+    fmt.Println("        This flag will cause bpm to use the specified remote url rather than the url associated with the remote name")
+    fmt.Println("");
+    fmt.Println("        Examples:")
+    fmt.Println("")
+    fmt.Println("        bpm install --remoteurl=https://neudesic.timu.com/myproject.git")
+    fmt.Println("")
     fmt.Println("    --skipnpm");
     fmt.Println("");
     fmt.Println("        This flag will cause bpm to skip the package manager install phase")

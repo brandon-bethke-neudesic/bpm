@@ -55,7 +55,7 @@ func updateLocalBpm(bpm *BpmData, moduleSourceUrl string, itemName string, item 
     existingItem := bpm.Dependencies[itemName];
     if !existingItem.Equal(newItem) {
         bpm.Dependencies[itemName] = newItem;
-        filePath := path.Join(Options.UseLocal, bpm.Name, Options.BpmFileName);
+        filePath := path.Join(Options.UseLocalPath, bpm.Name, Options.BpmFileName);
         err = bpm.IncrementVersion();
         if err != nil {
             return err;
@@ -93,8 +93,8 @@ func (cmd *UpdateCommand) Execute() (error) {
         if bpmModuleName != "" && bpmModuleName != updateModule {
             continue;
         }
-        if Options.UseLocal != "" && strings.Index(depItem.Url, "http") == -1 {
-            moduleSourceUrl := path.Join(Options.UseLocal, updateModule);
+        if Options.UseLocalPath != "" && strings.Index(depItem.Url, "http") == -1 {
+            moduleSourceUrl := path.Join(Options.UseLocalPath, updateModule);
             fmt.Println("Processing local dependency in", moduleSourceUrl)
             commit, err := DetermineLocalCommitValue(moduleSourceUrl)
             if err != nil {

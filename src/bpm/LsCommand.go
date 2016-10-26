@@ -11,8 +11,6 @@ import (
 
 type LsCommand struct {
     BpmModuleName string
-    GitRemote string
-    LocalPath string
 }
 
 func (cmd *LsCommand) Name() string {
@@ -97,8 +95,6 @@ func (cmd *LsCommand) PrintDependencies(bpm BpmData, indentLevel int) {
 }
 
 func (cmd *LsCommand) Execute() (error) {
-    cmd.GitRemote = Options.UseRemote;
-    cmd.LocalPath = Options.UseLocal;
     err := Options.DoesBpmFileExist();
     if err != nil {
         return err;

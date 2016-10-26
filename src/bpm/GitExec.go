@@ -12,6 +12,10 @@ type GitExec struct {
 }
 
 
+func (git *GitExec) IsGitRepo() bool {
+    return PathExists(".git")
+}
+
 func (git *GitExec) HasChanges() bool {
     rc := OsExec{Dir: git.Path, LogOutput: true}
     stdOut, err := rc.Run("git diff-index HEAD --")

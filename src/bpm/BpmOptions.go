@@ -12,8 +12,9 @@ import (
 type BpmOptions struct {
     Recursive bool
     ConflictResolutionType string
-    UseLocal string
-    UseRemote string
+    UseLocalPath string
+    UseRemoteName string
+    UseRemoteUrl string
     BpmCachePath string
     BpmFileName string
     LocalModuleName string
@@ -76,8 +77,9 @@ func (options *BpmOptions) Parse(args []string) {
     options.SkipNpmInstall = options.GetBoolOption(args, "--skipnpm")
     options.Recursive = options.GetBoolOption(args, "--recursive")
     options.ConflictResolutionType = options.GetNameValueOption(args, "--resolution=", "versioning")
-    options.UseRemote = options.GetNameValueOption(args, "--remote=", "origin")
-    options.UseLocal = options.GetRootOption(args);
+    options.UseRemoteName = options.GetNameValueOption(args, "--remote=", "origin")
+    options.UseRemoteUrl = options.GetNameValueOption(args, "--remoteurl=", "")
+    options.UseLocalPath = options.GetRootOption(args);
     options.Finalize = options.GetBoolOption(args, "--finalize")
     options.PackageManager = options.GetNameValueOption(args, "--pkgm=", "npm")
     options.WorkingDir, _ = os.Getwd();

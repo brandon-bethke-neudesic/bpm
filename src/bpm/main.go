@@ -100,18 +100,28 @@ func ProcessRemoteModule(itemRemoteUrl string, moduleCommit string) (*BpmData, *
 
 func MakeRemoteUrl(itemUrl string) (string, error) {
     adjustedUrl := itemUrl;
+    var err error;
     if adjustedUrl == "" {
-        git := GitExec{Path:Options.WorkingDir}
-        var err error;
-        adjustedUrl, err = git.GetRemoteUrl(Options.UseRemote)
-        if err != nil {
-            return "", bpmerror.New(err, "Error: There was a problem getting the remote url " + Options.UseRemote)
+        // If a remote url is specified then use that one, otherwise determine the url of the specified remote name.
+        if Options.UseRemoteUrl != "" {
+            adjustedUrl = Options.UseRemoteUrl;
+        } else {
+            git := GitExec{Path:Options.WorkingDir}
+            adjustedUrl, err = git.GetRemoteUrl(Options.UseRemoteName)
+            if err != nil {
+                return "", bpmerror.New(err, "Error: There was a problem getting the remote url " + Options.UseRemoteName)
+            }
         }
     } else if strings.Index(adjustedUrl, "http") != 0 {
-        git := GitExec{Path:Options.WorkingDir}
-        remoteUrl, err := git.GetRemoteUrl(Options.UseRemote)
-        if err != nil {
-            return "", bpmerror.New(err, "Error: There was a problem getting the remote url " + Options.UseRemote)
+        var remoteUrl string;
+        if Options.UseRemoteUrl != "" {
+            remoteUrl = Options.UseRemoteUrl;
+        } else {
+            git := GitExec{Path:Options.WorkingDir}
+            remoteUrl, err = git.GetRemoteUrl(Options.UseRemoteName)
+            if err != nil {
+                return "", bpmerror.New(err, "Error: There was a problem getting the remote url " + Options.UseRemoteName)
+            }
         }
         parsedUrl, err := url.Parse(remoteUrl)
         if err != nil {
@@ -131,8 +141,8 @@ func ProcessDependencies(bpm *BpmData, parentUrl string, localItemProcessed Loca
         if err != nil {
             return err;
         }
-        if Options.UseLocal != "" && strings.Index(item.Url, "http") == -1 {
-            moduleSourceUrl := path.Join(Options.UseLocal, itemName);
+        if Options.UseLocalPath != "" && strings.Index(item.Url, "http") == -1 {
+            moduleSourceUrl := path.Join(Options.UseLocalPath, itemName);
             fmt.Println("Processing local dependency in", moduleSourceUrl)
             moduleBpm, cacheItem, err := ProcessLocalModule(moduleSourceUrl)
             if err != nil {
