@@ -178,6 +178,9 @@ func ProcessDependencies(bpm *BpmData, parentUrl string, localItemProcessed Loca
                 itemClonePath = localPath;
             } else if !PathExists(itemClonePath) {
                 fmt.Println("Could not find module", itemName, "in the bpm cache. Cloning repository...")
+                if item.Commit == "local" {
+                    return bpmerror.New(nil, "Error: The commit hash is specified as 'local' for dependency " + itemName + ". Please finalize the commit hash for this dependency.")
+                }
                 var err error;
                 parentUrl, err = MakeRemoteUrl(parentUrl);
                 if err != nil {
