@@ -136,6 +136,11 @@ func (r *ModuleCache) AddLatest(item *ModuleCacheItem) (bool, error) {
         return false, nil;
     }
 
+    // If the new item is a 'local' item, then the local item always has priority and just add it.
+    if strings.HasSuffix(item.Path, "/" + Options.LocalModuleName) {
+        return r.Add(item), nil
+    }
+
     if Options.ConflictResolutionType == "revisionlist" {
         fmt.Println("Attempting to determine which commit is the ancestor...")
         // If commitB is printed, then commitA is an ancestor of commit B
