@@ -5,7 +5,6 @@ import (
     "fmt"
     "path"
     "strings"
-    "sort"
     "bpmerror"
 )
 
@@ -35,13 +34,7 @@ func (cmd *LsCommand) IndentAndPrint(indentLevel int, mytext string){
 
 func (cmd *LsCommand) PrintDependencies(bpm BpmData, indentLevel int) {
     // Sort the dependency keys so the dependencies always print in the same order
-    sortedKeys := make([]string, len(bpm.Dependencies))
-    i := 0
-    for k, _ := range bpm.Dependencies {
-        sortedKeys[i] = k
-        i++
-    }
-    sort.Strings(sortedKeys)
+    sortedKeys := bpm.GetSortedKeys();
     for _, itemName := range sortedKeys {
         item := bpm.Dependencies[itemName]
         if itemName == bpm.Name {

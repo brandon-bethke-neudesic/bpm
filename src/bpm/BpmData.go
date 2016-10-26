@@ -7,6 +7,7 @@ import (
     "fmt"
     "strings"
     "bpmerror"
+    "sort"
 )
 
 /*
@@ -59,6 +60,17 @@ func (bpm *BpmData) String() string {
     }
 
     return string(bytes);
+}
+
+func (bpm *BpmData) GetSortedKeys() []string {
+    sortedKeys := make([]string, len(bpm.Dependencies))
+    i := 0
+    for k, _ := range bpm.Dependencies {
+        sortedKeys[i] = k
+        i++
+    }
+    sort.Strings(sortedKeys)
+    return sortedKeys;
 }
 
 func (bpm *BpmData) WriteFile(file string) error {

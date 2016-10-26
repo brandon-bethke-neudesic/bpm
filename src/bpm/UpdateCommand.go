@@ -88,7 +88,10 @@ func (cmd *UpdateCommand) Execute() (error) {
         return bpmerror.New(err, "Error: Could not find module " + bpmModuleName + " in the dependencies")
     }
 
-    for updateModule, depItem := range bpm.Dependencies {
+    // Always process the keys sorted by name so the installation is consistent
+    sortedKeys := bpm.GetSortedKeys();
+    for _, updateModule := range sortedKeys {
+        depItem := bpm.Dependencies[updateModule]
         // If a specific module name was specified then skip the others.
         if bpmModuleName != "" && bpmModuleName != updateModule {
             continue;

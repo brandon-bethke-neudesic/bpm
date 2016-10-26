@@ -135,7 +135,10 @@ func MakeRemoteUrl(itemUrl string) (string, error) {
 type LocalItemProcessed func(bpm *BpmData, moduleSourceUrl string, itemName string, item *BpmDependency) error;
 
 func ProcessDependencies(bpm *BpmData, parentUrl string, localItemProcessed LocalItemProcessed) (error) {
-    for itemName, item := range bpm.Dependencies {
+    // Always process the keys sorted by name so the installation is consistent
+    sortedKeys := bpm.GetSortedKeys();
+    for _, itemName := range sortedKeys {
+        item := bpm.Dependencies[itemName]
         fmt.Println("Validating dependency", itemName)
         err := item.Validate();
         if err != nil {
