@@ -132,9 +132,9 @@ func MakeRemoteUrl(itemUrl string) (string, error) {
     return adjustedUrl, nil;
 }
 
-type LocalItemProcessed func(bpm *BpmData, moduleSourceUrl string, itemName string, item *BpmDependency) error;
+type ItemProcessedEvent func(item *ItemProcessed) error;
 
-func ProcessDependencies(bpm *BpmData, parentUrl string, localItemProcessed LocalItemProcessed) (error) {
+func ProcessDependencies(bpm *BpmData, parentUrl string, itemProcessedEvent ItemProcessedEvent) (error) {
     // Always process the keys sorted by name so the installation is consistent
     sortedKeys := bpm.GetSortedKeys();
     for _, itemName := range sortedKeys {
@@ -152,13 +152,13 @@ func ProcessDependencies(bpm *BpmData, parentUrl string, localItemProcessed Loca
                 return err;
             }
             moduleCache.Add(cacheItem)
-            err = ProcessDependencies(moduleBpm, "", localItemProcessed)
+            err = ProcessDependencies(moduleBpm, "", itemProcessedEvent)
             if err != nil {
                 return err;
             }
 
-            if localItemProcessed != nil {
-                err = localItemProcessed(bpm, moduleSourceUrl, itemName, item)
+            if itemProcessedEvent != nil {
+                err = itemProcessedEvent(&ItemProcessed{Bpm:bpm, Source: moduleSourceUrl, Name: itemName, Item: item, Local: true})
                 if err != nil {
                     return err;
                 }
@@ -226,6 +226,13 @@ func ProcessDependencies(bpm *BpmData, parentUrl string, localItemProcessed Loca
             if err != nil {
                 return err;
             }
+
+            if itemProcessedEvent != nil {
+                err = itemProcessedEvent(&ItemProcessed{Bpm:bpm, Source: itemClonePath, Name: itemName, Item: item, Local: false})
+                if err != nil {
+                    return err;
+                }
+            }
         }
     }
     return nil;
@@ -233,7 +240,10 @@ func ProcessDependencies(bpm *BpmData, parentUrl string, localItemProcessed Loca
 
 func main() {
     Options.Parse(os.Args);
-    err := Options.Command.Execute();
+    err := Options.Validate();
+    if err == nil {
+        err = Options.Command.Execute();
+    }
     if err != nil {
         fmt.Println(err)
         fmt.Println("Finished with errors")

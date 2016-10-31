@@ -1,7 +1,13 @@
 #!/bin/bash
 export GOPATH=`pwd`
 go get bpm
+if [[ $? -ne 0 ]]; then
+    exit 0
+fi
 go install bpm
+if [[ $? -ne 0 ]]; then
+    exit 0
+fi
 if [ -f /usr/local/bin/bpm ]; then
     rm /usr/local/bin/bpm
 fi

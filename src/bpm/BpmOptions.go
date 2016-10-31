@@ -6,6 +6,7 @@ import (
     "fmt"
     "os"
     "errors"
+    "bpmerror"
 )
 
 
@@ -23,6 +24,7 @@ type BpmOptions struct {
     Finalize bool
     PackageManager string
     WorkingDir string
+    Trim bool
     Command SubCommand
 }
 
@@ -83,6 +85,17 @@ func (options *BpmOptions) Parse(args []string) {
     options.Finalize = options.GetBoolOption(args, "--finalize")
     options.PackageManager = options.GetNameValueOption(args, "--pkgm=", "npm")
     options.WorkingDir, _ = os.Getwd();
+    options.Trim = options.GetBoolOption(args, "--trim")
+}
+
+func (options *BpmOptions) Validate() error {
+    if options.Recursive && options.UseLocalPath == "" {
+        return bpmerror.New(nil, "Error: The --recursive option can only be used with the --root= option")
+    }
+    if options.Trim && options.Command.Name() != "clean" {
+        return bpmerror.New(nil, "Error: The --trim option can only be used with the clean command")
+    }
+    return nil
 }
 
 func (options *BpmOptions) GetNameValueOption(args []string, name string, defaultValue string) (string) {

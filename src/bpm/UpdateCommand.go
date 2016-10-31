@@ -42,25 +42,25 @@ func DetermineLocalCommitValue(source string) (string, error) {
     return commit, nil
 }
 
-func updateLocalBpm(bpm *BpmData, moduleSourceUrl string, itemName string, item *BpmDependency) error {
+func updateRecursiveLocalItems(itemProcessed *ItemProcessed) error {
     // Only update and save the bpm if the recursive option is set.
-    if !Options.Recursive {
+    if !Options.Recursive || !itemProcessed.Local {
         return nil;
     }
-    commit, err := DetermineLocalCommitValue(moduleSourceUrl)
+    commit, err := DetermineLocalCommitValue(itemProcessed.Source)
     if err != nil {
-        return bpmerror.New(err, "Error: There was an issue getting the latest commit for " + itemName)
+        return bpmerror.New(err, "Error: There was an issue getting the latest commit for " + itemProcessed.Name)
     }
-    newItem := &BpmDependency{Url: item.Url, Commit:commit}
-    existingItem := bpm.Dependencies[itemName];
+    newItem := &BpmDependency{Url: itemProcessed.Item.Url, Commit:commit}
+    existingItem := itemProcessed.Bpm.Dependencies[itemProcessed.Name];
     if !existingItem.Equal(newItem) {
-        bpm.Dependencies[itemName] = newItem;
-        filePath := path.Join(Options.UseLocalPath, bpm.Name, Options.BpmFileName);
-        err = bpm.IncrementVersion();
+        itemProcessed.Bpm.Dependencies[itemProcessed.Name] = newItem;
+        filePath := path.Join(Options.UseLocalPath, itemProcessed.Bpm.Name, Options.BpmFileName);
+        err = itemProcessed.Bpm.IncrementVersion();
         if err != nil {
             return err;
         }
-        err = bpm.WriteFile(filePath)
+        err = itemProcessed.Bpm.WriteFile(filePath)
         if err != nil {
             return err;
         }
@@ -108,7 +108,7 @@ func (cmd *UpdateCommand) Execute() (error) {
                 return err;
             }
             moduleCache.Add(cacheItem)
-            err = ProcessDependencies(moduleBpm, "", updateLocalBpm)
+            err = ProcessDependencies(moduleBpm, "", updateRecursiveLocalItems)
             if err != nil {
                 return err;
             }
