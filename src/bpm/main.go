@@ -158,7 +158,7 @@ func ProcessDependencies(bpm *BpmData, parentUrl string, itemProcessedEvent Item
             }
 
             if itemProcessedEvent != nil {
-                err = itemProcessedEvent(&ItemProcessed{Bpm:bpm, Source: moduleSourceUrl, Name: itemName, Item: item, Local: true})
+                err = itemProcessedEvent(&ItemProcessed{Bpm:bpm, Source: moduleSourceUrl, Cache: cacheItem.Path, Name: itemName, Item: item, Local: true})
                 if err != nil {
                     return err;
                 }
@@ -228,7 +228,7 @@ func ProcessDependencies(bpm *BpmData, parentUrl string, itemProcessedEvent Item
             }
 
             if itemProcessedEvent != nil {
-                err = itemProcessedEvent(&ItemProcessed{Bpm:bpm, Source: itemClonePath, Name: itemName, Item: item, Local: false})
+                err = itemProcessedEvent(&ItemProcessed{Bpm:bpm, Source: itemClonePath, Cache: cacheItem.Path, Name: itemName, Item: item, Local: false})
                 if err != nil {
                     return err;
                 }

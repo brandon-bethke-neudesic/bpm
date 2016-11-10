@@ -56,6 +56,7 @@ func updateRecursiveLocalItems(itemProcessed *ItemProcessed) error {
     if !existingItem.Equal(newItem) {
         itemProcessed.Bpm.Dependencies[itemProcessed.Name] = newItem;
         filePath := path.Join(Options.UseLocalPath, itemProcessed.Bpm.Name, Options.BpmFileName);
+        cachePath := path.Join(itemProcessed.Cache, Options.BpmFileName);
         err = itemProcessed.Bpm.IncrementVersion();
         if err != nil {
             return err;
@@ -64,6 +65,7 @@ func updateRecursiveLocalItems(itemProcessed *ItemProcessed) error {
         if err != nil {
             return err;
         }
+        err = itemProcessed.Bpm.WriteFile(cachePath)
     }
     return nil;
 }

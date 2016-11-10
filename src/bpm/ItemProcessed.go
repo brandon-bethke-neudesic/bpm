@@ -5,5 +5,6 @@ type ItemProcessed struct {
     Item *BpmDependency
     Name string
     Source string
+    Cache string
     Local bool
 }
