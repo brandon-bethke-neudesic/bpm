@@ -37,11 +37,9 @@ func PathExists(path string) (bool) {
 }
 
 func ProcessLocalModule(source string) (*BpmData, *ModuleCacheItem, error) {
-    moduleBpm := &BpmData{};
-    moduleBpmFilePath := path.Join(source, Options.BpmFileName);
-    err := moduleBpm.LoadFile(moduleBpmFilePath);
+    moduleBpm, err := LoadBpmData(source)
     if err != nil {
-        return nil, nil, bpmerror.New(err, "Error: Could not load the bpm.json file for dependency " + source)
+        return nil, nil, err;
     }
     itemPath := path.Join(Options.BpmCachePath, moduleBpm.Name, Options.LocalModuleName);
     // Clean out the destination directory and then copy the files from the source directory to the final location in the bpm cache.
@@ -61,18 +59,15 @@ func ProcessRemoteModule(itemRemoteUrl string, moduleCommit string) (*BpmData, *
     defer os.RemoveAll(path.Join(itemPathTemp, ".."))
     os.RemoveAll(path.Join(itemPathTemp));
     os.MkdirAll(itemPathTemp, 0777)
-    moduleBpm := &BpmData{};
+    moduleBpm, err := LoadBpmData(itemPathTemp)
+    if err != nil {
+        return nil, nil, err;
+    }
     git := GitExec{Path:itemPathTemp}
-    err := git.InitAndCheckout(itemRemoteUrl, moduleCommit)
+    err = git.InitAndCheckout(itemRemoteUrl, moduleCommit)
     if err != nil {
         return nil, nil, bpmerror.New(err, "Error: There was an issue initializing the repository for dependency " + moduleBpm.Name + " Url: " + itemRemoteUrl + " Commit: " + moduleCommit)
     }
-    moduleBpmFilePath := path.Join(itemPathTemp, Options.BpmFileName);
-    err = moduleBpm.LoadFile(moduleBpmFilePath);
-    if err != nil {
-        return nil, nil, bpmerror.New(err, "Error: Could not load the bpm.json file for dependency at " + moduleBpmFilePath)
-    }
-
     if moduleCommit == "master" {
         moduleCommit, err = git.GetLatestCommit()
         if err != nil {

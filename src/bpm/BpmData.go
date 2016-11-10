@@ -8,6 +8,7 @@ import (
     "strings"
     "bpmerror"
     "sort"
+    "path"
 )
 
 /*
@@ -32,6 +33,17 @@ type BpmData struct {
 	Version string `json:"version"`
     Dependencies map[string]*BpmDependency `json:"dependencies"`
 }
+
+func LoadBpmData(source string) (*BpmData, error) {
+    bpm := &BpmData{};
+    bpmJsonFile := path.Join(source, Options.BpmFileName);
+    err := bpm.LoadFile(bpmJsonFile);
+    if err != nil {
+        return nil, bpmerror.New(err, "Error: Could not load the bpm.json file for dependency " + source)
+    }
+    return bpm, nil;
+}
+
 
 func (bpm *BpmData) IncrementVersion() (error){
     bpmVersion, err := semver.Make(bpm.Version);
