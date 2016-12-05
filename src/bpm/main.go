@@ -59,14 +59,10 @@ func ProcessRemoteModule(itemRemoteUrl string, moduleCommit string) (*BpmData, *
     defer os.RemoveAll(path.Join(itemPathTemp, ".."))
     os.RemoveAll(path.Join(itemPathTemp));
     os.MkdirAll(itemPathTemp, 0777)
-    moduleBpm, err := LoadBpmData(itemPathTemp)
-    if err != nil {
-        return nil, nil, err;
-    }
     git := GitExec{Path:itemPathTemp}
-    err = git.InitAndCheckout(itemRemoteUrl, moduleCommit)
+    err := git.InitAndCheckout(itemRemoteUrl, moduleCommit)
     if err != nil {
-        return nil, nil, bpmerror.New(err, "Error: There was an issue initializing the repository for dependency " + moduleBpm.Name + " Url: " + itemRemoteUrl + " Commit: " + moduleCommit)
+        return nil, nil, bpmerror.New(err, "Error: There was an issue initializing the repository for dependency " + itemRemoteUrl + " Url: " + itemRemoteUrl + " Commit: " + moduleCommit)
     }
     if moduleCommit == "master" {
         moduleCommit, err = git.GetLatestCommit()
@@ -74,7 +70,10 @@ func ProcessRemoteModule(itemRemoteUrl string, moduleCommit string) (*BpmData, *
             return nil, nil, err;
         }
     }
-
+    moduleBpm, err := LoadBpmData(itemPathTemp)
+    if err != nil {
+        return nil, nil, err;
+    }
     itemPath := path.Join(Options.BpmCachePath, moduleBpm.Name, moduleCommit);
     // Clean out the destination directory and then copy the files from the temp directory to the final location in the bpm cache.
     os.RemoveAll(itemPath)
