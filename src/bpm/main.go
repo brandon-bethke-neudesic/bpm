@@ -216,7 +216,11 @@ func ProcessDependencies(bpm *BpmData, parentUrl string, itemProcessedEvent Item
             moduleCache.AddLatest(cacheItem)
 
             fmt.Println("Processing all dependencies for", moduleBpm.Name, "version", moduleBpm.Version);
-            err = ProcessDependencies(moduleBpm, itemRemoteUrl, nil)
+            if Options.UseParentUrl {
+                err = ProcessDependencies(moduleBpm, itemRemoteUrl, nil)
+            } else {
+                err = ProcessDependencies(moduleBpm, "", nil)
+            }
             if err != nil {
                 return err;
             }

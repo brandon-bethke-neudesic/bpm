@@ -25,6 +25,7 @@ type BpmOptions struct {
     PackageManager string
     WorkingDir string
     Trim bool
+    UseParentUrl bool
     Command SubCommand
 }
 
@@ -86,6 +87,7 @@ func (options *BpmOptions) Parse(args []string) {
     options.PackageManager = options.GetNameValueOption(args, "--pkgm=", "npm")
     options.WorkingDir, _ = os.Getwd();
     options.Trim = options.GetBoolOption(args, "--trim")
+    options.UseParentUrl = options.GetBoolOption(args, "--useparenturl")
 }
 
 func (options *BpmOptions) Validate() error {

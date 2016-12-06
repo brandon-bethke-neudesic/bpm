@@ -129,7 +129,11 @@ func (cmd *UpdateCommand) Execute() (error) {
                 return err;
             }
             moduleCache.Add(cacheItem)
-            err = ProcessDependencies(moduleBpm, itemRemoteUrl, nil)
+            if Options.UseParentUrl {
+                err = ProcessDependencies(moduleBpm, itemRemoteUrl, nil)
+            } else {
+                err = ProcessDependencies(moduleBpm, "", nil)                
+            }
             if err != nil {
                 return err;
             }
