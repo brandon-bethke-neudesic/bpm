@@ -16,7 +16,7 @@ var Options = BpmOptions {
     BpmCachePath: "bpm_modules",
     BpmFileName: "bpm.json",
     LocalModuleName: "local",
-    ExcludeFileList: ".git|.gitignore|.gitmodules|bpm_modules",
+    ExcludeFileList: ".git|.gitignore|.gitmodules|bpm_modules|node_modules",
 }
 
 func SliceIndex(limit int, predicate func(i int) bool) int {

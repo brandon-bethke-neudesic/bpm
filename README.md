@@ -238,6 +238,8 @@ The option `--resolution=revisionlist` will attempt to determine which commit is
 
 The option `--skipnpm` will skip the package manager install phase.
 
+The option `--remoteurl=https://host/path.git` will cause bpm to use the specified url as the remote url for all relative path rather than the remote name.
+
 Supported Package Managers
 
 bpm supports npm and yarn. To specify a package manger use the --pkgm= option. By default npm is used.
