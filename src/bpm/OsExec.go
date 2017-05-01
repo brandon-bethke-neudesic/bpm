@@ -20,6 +20,9 @@ func (rc *OsExec) Run(command string) (string, error) {
     cmd := exec.Command("sh", "-c", command);
     cmd.Dir = rc.Dir;
 
+    stdOutDone := make(chan bool);
+    stdErrDone := make(chan bool);
+
     var buffer bytes.Buffer
     stdout, err := cmd.StdoutPipe();
     stderr, err := cmd.StderrPipe();
@@ -32,6 +35,7 @@ func (rc *OsExec) Run(command string) (string, error) {
             }
             buffer.WriteString(fmt.Sprintf("%s\n", text))
         }
+        stdOutDone <- true;
     }()
 
     scannerErr := bufio.NewScanner(stderr)
@@ -43,11 +47,14 @@ func (rc *OsExec) Run(command string) (string, error) {
             }
             buffer.WriteString(fmt.Sprintf("%s\n", text))
         }
+        stdErrDone <- true;
     }()
 
     err = cmd.Start();
     if err == nil {
         err = cmd.Wait();
     }
+    <-stdOutDone
+    <-stdErrDone
     return buffer.String(), err;
 }
