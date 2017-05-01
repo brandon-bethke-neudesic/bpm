@@ -6,6 +6,7 @@ import (
     "strings"
     "path"
     "bpmerror"
+    "errors"
 )
 
 type UninstallCommand struct {
@@ -25,15 +26,13 @@ func (cmd *UninstallCommand) getUninstallModuleName() (string){
 }
 
 func (cmd *UninstallCommand) Execute() (error) {
-    err := Options.DoesBpmFileExist();
-    if err != nil {
-        return err;
+    if !Options.BpmFileExists() {
+        return errors.New("Error: The " + Options.BpmFileName + " file does not exist.");
     }
-    fmt.Println("Reading",Options.BpmFileName,"...")
     bpm := BpmData{}
-    err = bpm.LoadFile(Options.BpmFileName);
+    err := bpm.LoadFile(Options.BpmFileName);
     if err != nil {
-        return bpmerror.New(err, "Error: There was a problem loading the bpm.json file")
+        return bpmerror.New(err, "Error: There was a problem loading the " + Options.BpmFileName + " file")
     }
 
     if !bpm.HasDependencies() {
@@ -48,13 +47,14 @@ func (cmd *UninstallCommand) Execute() (error) {
 
     _, exists := bpm.Dependencies[uninstallModuleName];
     if !exists {
-        fmt.Println(uninstallModuleName, "is not a dependency")
+        fmt.Println("Error: " + uninstallModuleName + " is not a dependency")
         return nil;
     }
 
     delete(bpm.Dependencies, uninstallModuleName)
     workingPath,_ := os.Getwd();
     npm := NpmExec{Path: workingPath}
+    fmt.Println("Uninstalling npm module " + uninstallModuleName);
     err = npm.Uninstall(uninstallModuleName)
     if err != nil {
         return bpmerror.New(err, "Error: Failed to npm uninstall module " + uninstallModuleName)

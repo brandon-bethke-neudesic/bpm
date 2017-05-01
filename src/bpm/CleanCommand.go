@@ -5,6 +5,7 @@ import (
     "os"
     "path"
     "bpmerror"
+    "errors"
     "io/ioutil"
 )
 
@@ -16,12 +17,11 @@ func (cmd *CleanCommand) Name() string {
 }
 
 func (cmd *CleanCommand) Trim() (error) {
-    err := Options.DoesBpmFileExist();
-    if err != nil {
-        return err;
+    if !Options.BpmFileExists() {
+        return errors.New("Error: The " + Options.BpmFileName + " file does not exist.");
     }
     bpm := &BpmData{};
-    err = bpm.LoadFile(Options.BpmFileName);
+    err := bpm.LoadFile(Options.BpmFileName);
     if err != nil {
         return bpmerror.New(nil, "Error: There was a problem loading the bpm.json file")
     }

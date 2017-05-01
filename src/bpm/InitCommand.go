@@ -2,7 +2,6 @@ package main;
 
 import (
     "fmt"
-    "path"
     "os"
     "bpmerror"
 )
@@ -21,7 +20,7 @@ func (cmd *InitCommand) Execute() (error) {
     }
     bpmModuleName := os.Args[index + 1];
     bpm := BpmData{Name:bpmModuleName, Version:"1.0.0", Dependencies:make(map[string]*BpmDependency)};
-    err := bpm.WriteFile(path.Join(Options.WorkingDir, Options.BpmFileName))
+    err := bpm.WriteFile(Options.BpmFileName)
     if err != nil {
         return err;
     }

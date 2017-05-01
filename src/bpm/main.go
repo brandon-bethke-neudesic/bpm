@@ -9,6 +9,8 @@ import (
     "strings"
     "github.com/blang/semver"
     "bpmerror"
+    "path/filepath"
+    "errors"
 )
 
 var moduleCache = ModuleCache{Items:make(map[string]*ModuleCacheItem)};
@@ -36,86 +38,210 @@ func PathExists(path string) (bool) {
     return true
 }
 
-func ProcessLocalModule(source string) (*BpmData, *ModuleCacheItem, error) {
-    moduleBpm, err := LoadBpmData(source)
+func AddRemotes(source string, itemPath string) error {
+    git := GitExec{}
+    remotes, err := git.GetRemotes();
     if err != nil {
-        return nil, nil, err;
+        return bpmerror.New(err, "Error: There was an error attempting to determine the remotes of this repository.")
     }
-    itemPath := path.Join(Options.BpmCachePath, moduleBpm.Name, Options.LocalModuleName);
-    // Clean out the destination directory and then copy the files from the source directory to the final location in the bpm cache.
-    os.RemoveAll(itemPath)
-    os.MkdirAll(itemPath, 0777)
-    copyDir := CopyDir{Exclude:Options.ExcludeFileList}
-    err = copyDir.Copy(source, itemPath);
-    if err != nil {
-        return nil, nil, bpmerror.New(err, "Error: There was an issue trying to copy the local folder to the bpm_cache for " + source)
+
+    git = GitExec{Path: itemPath}
+    origin := git.GetRemote("origin");
+    if origin == nil {
+        return errors.New("Error: The remote 'origin' is missing in this repository.")
     }
-    cacheItem := &ModuleCacheItem{Name:moduleBpm.Name, Path: itemPath}
-    return moduleBpm, cacheItem, nil
+
+    for _, remote := range remotes {
+        // Always re-add the remotes
+        if remote.Name != "local" && remote.Name != "origin" {
+            git.DeleteRemote(remote.Name);
+            if strings.HasPrefix(source, "http") {
+                fmt.Println("Adding remote " + origin.Url + " as " + remote.Name + " to " + itemPath)
+                git.AddRemote(remote.Name, origin.Url)
+                if err != nil {
+                    return bpmerror.New(err, "Error: There was an error adding the remote to the repository at " + itemPath)
+                }
+            } else {
+                parsedUrl, err := url.Parse(remote.Url)
+                if err != nil {
+                    return bpmerror.New(err, "Error: There was a problem parsing the remote url " + remote.Url)
+                }
+                adjustedUrl := parsedUrl.Scheme + "://" + path.Join(parsedUrl.Host, parsedUrl.Path, source)
+                fmt.Println("Adding remote " + adjustedUrl + " as " + remote.Name + " to " + itemPath)
+                err = git.AddRemote(remote.Name, adjustedUrl)
+                if err != nil {
+                    return bpmerror.New(err, "Error: There was an error adding the remote to the repository at " + itemPath)
+                }
+            }
+        }
+    }
+
+    if Options.UseLocalPath != "" && !strings.HasPrefix(source, "http"){
+        source = strings.Split(source, ".git")[0]
+        // Rename the origin to local and then add the original origin as origin
+        gitSource := GitExec{Path: path.Join(".", source)}
+        gitDestination := GitExec{Path: itemPath};
+        if !gitDestination.RemoteExists("local") {
+            origin := gitSource.GetRemote("origin")
+            if origin == nil {
+                return errors.New("Error: The remote 'origin' is missing")
+            }
+            localRemote := path.Join(Options.WorkingDir, source);
+            fmt.Println("Adding remote " + localRemote + " as local to " + itemPath)
+            err = gitDestination.AddRemote("local", localRemote)
+            if err != nil {
+                return bpmerror.New(err, "Error: There was an error adding the remote to the repository at " + itemPath)
+            }
+            gitDestination.DeleteRemote("origin");
+            fmt.Println("Adding remote " + origin.Url + " as origin to " + itemPath)
+            err = gitDestination.AddRemote("origin", origin.Url)
+            if err != nil {
+                return bpmerror.New(err, "Error: There was an error adding the remote to the repository at " + itemPath)
+            }
+        }
+    } else {
+        gitDestination := GitExec{Path: itemPath};
+        gitDestination.DeleteRemote("local");
+    }
+    return nil
 }
 
-func ProcessRemoteModule(itemRemoteUrl string, moduleCommit string) (*BpmData, *ModuleCacheItem, error) {
-    itemPathTemp := path.Join(Options.WorkingDir, Options.BpmCachePath, "xx_temp_xx", "xx_temp_xx")
-    defer os.RemoveAll(path.Join(itemPathTemp, ".."))
-    os.RemoveAll(path.Join(itemPathTemp));
-    os.MkdirAll(itemPathTemp, 0777)
-    git := GitExec{Path:itemPathTemp}
-    err := git.InitAndCheckout(itemRemoteUrl, moduleCommit)
-    if err != nil {
-        return nil, nil, bpmerror.New(err, "Error: There was an issue initializing the repository for dependency " + itemRemoteUrl + " Url: " + itemRemoteUrl + " Commit: " + moduleCommit)
+func CopyChanges(source string, destination string) error {
+
+    // The the local option is used and the source repository url is a relative path, then copy any uncommitted changes.
+    if Options.UseLocalPath != "" && strings.Index(source, "http") == -1 {
+        fmt.Println("Copying local changes from " + source + " to " + destination)
+
+        // Get all the changed files in the source repository, exluding deleted files, and copy them to the destination repository.
+        git := GitExec{Path: source}
+        files, err := git.LsFiles();
+        if err != nil {
+            return bpmerror.New(err, "Error: There was an error listing the changes in the repository at " + source)
+        }
+        copyDir := &CopyDir{};
+        for _, file := range files {
+            fileSource := path.Join(source, file)
+            fileDestination := path.Join(destination, file)
+
+            parent, _ := filepath.Split(fileDestination)
+            os.MkdirAll(parent, 0777)
+            err = copyDir.CopyFile(fileSource, fileDestination);
+            if err != nil {
+                return bpmerror.New(err, "Error: There was an error copying the changes from " + fileSource + " to " + fileDestination);
+            }
+        }
+
+        // Retreive all the deleted files in the source repository and delete them from the destination repository
+        files, err = git.DeletedFiles();
+        if err != nil {
+            return bpmerror.New(err, "Error: There was an error listing the deleted files in the repository at " + source)
+        }
+        for _, file := range files {
+            fileDestination := path.Join(destination, file);
+            os.Remove(fileDestination);
+        }
     }
-    if moduleCommit == "master" {
-        moduleCommit, err = git.GetLatestCommit()
+    return nil;
+}
+
+func ProcessModule(source string) (*BpmData, *ModuleCacheItem, error) {
+    source = strings.Split(source, ".git")[0]
+    _, itemName := filepath.Split(source)
+    itemPath := path.Join(Options.BpmCachePath, itemName);
+
+    if PathExists(itemPath) {
+        if Options.Command.Name() == "update" {
+
+            git := GitExec{Path: itemPath}
+            //if Options.UseLocalPath != "" && strings.Index(source, "http") == -1 {
+                // Remove any uncommited changes
+                err := git.Checkout(".");
+                if err != nil {
+                    return nil, nil, err;
+                }
+            //}
+
+            err = AddRemotes(source, itemPath);
+            if err != nil {
+                return nil, nil, err;
+            }
+
+            pullRemote := Options.UseRemoteName;
+            if git.RemoteExists("local") {
+                pullRemote = "local"
+            }
+
+            git.LogOutput = true
+            err = git.Pull(pullRemote, "master");
+            if err != nil {
+                return nil, nil, err;
+            }
+            git.LogOutput = false;
+
+            err = CopyChanges(source, itemPath);
+            if err != nil {
+                return nil, nil, err;
+            }
+
+        } else {
+            fmt.Println("Using cached item", itemName)
+        }
+    } else {
+        git := GitExec{LogOutput: true}
+        err := git.Clone(source, itemPath);
+        if err != nil {
+            return nil, nil, err;
+        }
+
+        err = AddRemotes(source, itemPath);
+        if err != nil {
+            return nil, nil, err;
+        }
+
+        err = CopyChanges(source, itemPath);
         if err != nil {
             return nil, nil, err;
         }
     }
-    moduleBpm, err := LoadBpmData(itemPathTemp)
-    if err != nil {
-        return nil, nil, err;
-    }
-    itemPath := path.Join(Options.BpmCachePath, moduleBpm.Name, moduleCommit);
-    // Clean out the destination directory and then copy the files from the temp directory to the final location in the bpm cache.
-    os.RemoveAll(itemPath)
-    copyDir := CopyDir{/*Exclude:Options.ExcludeFileList*/}
-    err = copyDir.Copy(itemPathTemp, itemPath);
-    if err != nil {
-        return nil, nil, err;
-    }
 
+    moduleBpm, err := LoadBpmData(itemPath)
+    if err != nil {
+        return nil, nil, err;
+    }
     moduleBpmVersion, err := semver.Make(moduleBpm.Version);
     if err != nil {
-        fmt.Println("Could not read the version");
+        fmt.Println("Error: Could not read the version");
         return nil, nil, err;
     }
-    cacheItem := &ModuleCacheItem{Name:moduleBpm.Name, Version: moduleBpmVersion.String(), Commit: moduleCommit, Path: itemPath}
+    cacheItem := &ModuleCacheItem{Name:itemName, Version: moduleBpmVersion.String(), Commit: "local", Path: itemPath}
     return moduleBpm, cacheItem, nil;
 }
 
 func MakeRemoteUrl(itemUrl string) (string, error) {
     adjustedUrl := itemUrl;
-    var err error;
     if adjustedUrl == "" {
         // If a remote url is specified then use that one, otherwise determine the url of the specified remote name.
         if Options.UseRemoteUrl != "" {
             adjustedUrl = Options.UseRemoteUrl;
         } else {
-            git := GitExec{Path:Options.WorkingDir}
-            adjustedUrl, err = git.GetRemoteUrl(Options.UseRemoteName)
-            if err != nil {
-                return "", bpmerror.New(err, "Error: There was a problem getting the remote url " + Options.UseRemoteName)
+            git := GitExec{}
+            remote := git.GetRemote(Options.UseRemoteName)
+            if remote == nil {
+                return "", errors.New("Error: There was a problem getting the remote url " + Options.UseRemoteName)
             }
+            adjustedUrl = remote.Url;
         }
     } else if strings.Index(adjustedUrl, "http") != 0 {
         var remoteUrl string;
         if Options.UseRemoteUrl != "" {
             remoteUrl = Options.UseRemoteUrl;
         } else {
-            git := GitExec{Path:Options.WorkingDir}
-            remoteUrl, err = git.GetRemoteUrl(Options.UseRemoteName)
-            if err != nil {
-                return "", bpmerror.New(err, "Error: There was a problem getting the remote url " + Options.UseRemoteName)
+            git := GitExec{}
+            remote := git.GetRemote(Options.UseRemoteName)
+            if remote == nil {
+                return "", errors.New("Error: There was a problem getting the remote url " + Options.UseRemoteName)
             }
+            remoteUrl = remote.Url;
         }
         parsedUrl, err := url.Parse(remoteUrl)
         if err != nil {
@@ -126,55 +252,44 @@ func MakeRemoteUrl(itemUrl string) (string, error) {
     return adjustedUrl, nil;
 }
 
-type ItemProcessedEvent func(item *ItemProcessed) error;
-
-func ProcessDependencies(bpm *BpmData, parentUrl string, itemProcessedEvent ItemProcessedEvent) (error) {
+func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
     // Always process the keys sorted by name so the installation is consistent
     sortedKeys := bpm.GetSortedKeys();
     for _, itemName := range sortedKeys {
+
+        if Options.Command.Name() == "install" {
+            // Do not process the item if it has already been processed
+            _, exists := moduleCache.Items[itemName];
+            if exists {
+                continue;
+            }
+        }
+
         item := bpm.Dependencies[itemName]
-        fmt.Println("Validating dependency", itemName)
         err := item.Validate();
         if err != nil {
-            return err;
+            return bpmerror.New(err, "Error: The dependency '" + itemName + "' has an issue")
         }
         if Options.UseLocalPath != "" && strings.Index(item.Url, "http") == -1 {
             moduleSourceUrl := path.Join(Options.UseLocalPath, itemName);
-            fmt.Println("Processing local dependency in", moduleSourceUrl)
-            moduleBpm, cacheItem, err := ProcessLocalModule(moduleSourceUrl)
+            moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl)
             if err != nil {
                 return err;
             }
             moduleCache.Add(cacheItem)
-            err = ProcessDependencies(moduleBpm, "", itemProcessedEvent)
+            fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
+            err = ProcessDependencies(moduleBpm, "")
             if err != nil {
                 return err;
             }
-
-            if itemProcessedEvent != nil {
-                err = itemProcessedEvent(&ItemProcessed{Bpm:bpm, Source: moduleSourceUrl, Cache: cacheItem.Path, Name: itemName, Item: item, Local: true})
-                if err != nil {
-                    return err;
-                }
-            }
-
         } else {
-            fmt.Println("Processing dependency", itemName)
-
             itemPath := path.Join(Options.BpmCachePath, itemName)
-            os.Mkdir(itemPath, 0777)
+            os.Mkdir(Options.BpmCachePath, 0777)
 
             itemRemoteUrl := item.Url;
-            itemClonePath := path.Join(Options.WorkingDir, itemPath, item.Commit)
-            localPath := path.Join(Options.BpmCachePath, itemName, Options.LocalModuleName)
-            if PathExists(localPath) {
-                fmt.Println("Found local folder in the bpm modules. Using this folder", localPath)
-                itemClonePath = localPath;
-            } else if !PathExists(itemClonePath) {
-                fmt.Println("Could not find module", itemName, "in the bpm cache. Cloning repository...")
-                if item.Commit == "local" {
-                    return bpmerror.New(nil, "Error: The commit hash is specified as 'local' for dependency " + itemName + ". Please finalize the commit hash for this dependency.")
-                }
+            if PathExists(itemPath) {
+                fmt.Println("Using cached item", itemName)
+            } else {
                 var err error;
                 parentUrl, err = MakeRemoteUrl(parentUrl);
                 if err != nil {
@@ -188,48 +303,42 @@ func ProcessDependencies(bpm *BpmData, parentUrl string, itemProcessedEvent Item
                 if strings.Index(item.Url, "http") != 0 {
                     itemRemoteUrl = tempUrl.Scheme + "://" + path.Join(tempUrl.Host, tempUrl.Path, item.Url)
                 }
-                os.Mkdir(itemClonePath, 0777)
-                git := GitExec{Path: itemClonePath}
-                err = git.InitAndCheckout(itemRemoteUrl, item.Commit)
+                os.Mkdir(Options.BpmCachePath, 0777)
+                git := GitExec{Path: Options.BpmCachePath, LogOutput: true}
+                git.Clone(itemRemoteUrl, itemName)
                 if err != nil {
-                    os.RemoveAll(itemClonePath)
+                    os.RemoveAll(path.Join(Options.BpmCachePath, itemName))
                     return bpmerror.New(nil, "Error: There was an issue initializing the repository for dependency " + itemName + " Url: " + itemRemoteUrl + " Commit: " + item.Commit)
                 }
-            } else {
-                fmt.Println("Module", itemName, "already exists in the bpm cache.")
+                err = AddRemotes(item.Url, itemPath);
+                if err != nil {
+                    return err;
+                }
             }
+
             // Recursively get dependencies in the current dependency
             moduleBpm := &BpmData{};
-            moduleBpmFilePath := path.Join(itemClonePath, Options.BpmFileName)
+            moduleBpmFilePath := path.Join(itemPath, Options.BpmFileName)
             err := moduleBpm.LoadFile(moduleBpmFilePath);
             if err != nil {
                 return bpmerror.New(err, "Error: Could not load the bpm.json file for dependency " + itemName)
             }
 
-            fmt.Println("Validating bpm.json for", itemName)
             err = moduleBpm.Validate();
             if err != nil {
-                return err;
+                return bpmerror.New(err, "Error: There is an issue with the bpm.json file for " + itemName)
             }
-            cacheItem := &ModuleCacheItem{Name:moduleBpm.Name, Version: moduleBpm.Version, Commit: item.Commit, Path: itemClonePath}
-            fmt.Println("Adding to cache", cacheItem.Name)
+            cacheItem := &ModuleCacheItem{Name:itemName, Version: moduleBpm.Version, Commit: "local", Path: itemPath}
             moduleCache.AddLatest(cacheItem)
 
-            fmt.Println("Processing all dependencies for", moduleBpm.Name, "version", moduleBpm.Version);
+            fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
             if Options.UseParentUrl {
-                err = ProcessDependencies(moduleBpm, itemRemoteUrl, nil)
+                err = ProcessDependencies(moduleBpm, itemRemoteUrl)
             } else {
-                err = ProcessDependencies(moduleBpm, "", nil)
+                err = ProcessDependencies(moduleBpm, "")
             }
             if err != nil {
                 return err;
-            }
-
-            if itemProcessedEvent != nil {
-                err = itemProcessedEvent(&ItemProcessed{Bpm:bpm, Source: itemClonePath, Cache: cacheItem.Path, Name: itemName, Item: item, Local: false})
-                if err != nil {
-                    return err;
-                }
             }
         }
     }

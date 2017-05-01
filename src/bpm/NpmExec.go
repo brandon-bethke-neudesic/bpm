@@ -1,7 +1,6 @@
 package main;
 
 import (
-    "fmt"
 )
 
 type NpmExec struct {
@@ -9,7 +8,6 @@ type NpmExec struct {
 }
 
 func (npm *NpmExec) Uninstall(item string) error {
-    fmt.Println("Running npm uninstall on", item);
     npmCommand := "npm uninstall " + item
     rc := OsExec{Dir: npm.Path, LogOutput: true}
     _, err := rc.Run(npmCommand)
@@ -20,9 +18,6 @@ func (npm *NpmExec) Uninstall(item string) error {
 }
 
 func (npm *NpmExec) InstallUrl(url string) error {
-    fmt.Println("Running npm install in", npm.Path, "on", url)
-    // git clone <repo url> <destination directory>
-    // npm cache clean
     npmCommand := "npm install " + url
     rc := OsExec{Dir: npm.Path, LogOutput: true}
     _, err := rc.Run(npmCommand)

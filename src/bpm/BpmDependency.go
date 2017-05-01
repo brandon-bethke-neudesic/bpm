@@ -14,9 +14,6 @@ func (dep *BpmDependency) Validate() (error) {
     if strings.TrimSpace(dep.Url) == "" {
         return bpmerror.New(nil, "Error: No url specified")
     }
-    if strings.TrimSpace(dep.Commit) == "" {
-        return bpmerror.New(nil, "Error: No commit specified")
-    }
     return nil
 }
 

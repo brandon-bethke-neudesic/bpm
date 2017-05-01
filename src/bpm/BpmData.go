@@ -17,11 +17,9 @@ import (
     "version": "1.0.0",
     "dependencies": {
         "bpmdep1": {
-            "commit": "cd4a1ae3fb81c7a0b032c5f359b0e0691be933a9",
-            "url": "https://github.com/brandon-bethke-neudesic/bpmdep1.git"
+            "url": "../bpmdep1.git"
         },
         "bpmdep2": {
-            "commit": "abebc61f36b61e68d946392cf8457683ea20abc5",
             "url": "https://github.com/brandon-bethke-neudesic/bpmdep2.git"
         }
     }
@@ -43,7 +41,6 @@ func LoadBpmData(source string) (*BpmData, error) {
     }
     return bpm, nil;
 }
-
 
 func (bpm *BpmData) IncrementVersion() (error){
     bpmVersion, err := semver.Make(bpm.Version);

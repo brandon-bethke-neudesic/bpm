@@ -1,3 +1,8 @@
+Updates:
+
+    clone the first time, then do pulls
+
+
 Another package manager for nodejs projects
 
 How to build the bpm
@@ -14,8 +19,7 @@ Overview of the bpm.json file structure.
         "version" : "1.0.0",
         "dependencies" : {
             "my-depencency-1" : {
-                "url" : "../my-depencency-1.git",
-                "commit" : "90b0a2da501451cf55ee07f9faeb3f8707af6011"
+                "url" : "../my-depencency-1.git"
             }
         }
     }
@@ -29,8 +33,6 @@ dependencies: A map of the dependencies. The map key is the name of the dependen
 dependency map item
 
 url: The full or relative URL to the repository
-
-commit: The commit hash
 
 Install dependencies
 Dependencies specified in the bpm.json are installed using the `bpm install` command. bpm requires git and the repository where the bpm command is run must be a git repository with at least a remote of origin.
@@ -50,17 +52,14 @@ For example, given the following bpm.json for the repository my-component
         "version" : "1.0.0",
         "dependencies" : {
             "my-depencency-1" : {
-                "url" : "../my-depencency-1.git",
-                "commit" : "90b0a2da501451cf55ee07f9faeb3f8707af6011"
+                "url" : "../my-depencency-1.git"
             }
         }
     }
 
 The bpm command will:
 
-- create a directory in the bpm_modules folder for my-component
-- git fetch the repository at the specified URL
-- git checkout the specified commit hash in a subfolder
+- clone the repository in the bpm_modules folder
 - run a supported package manager install on my-component/hash. (npm or yarn)
 
 In this example, the URL is relative. Dependency URLs can be a full URL or a relative URL. For any dependency that has a relative url, the `--remote` option will be used to resolve the relative url to a full url. origin is the default remote. Therefore, if the origin is http://github.com/user/my-component.git, then the dependency url will be resolved to http://github.com/user/my-depencency-1.git
@@ -90,18 +89,17 @@ Install a new dependency.
 Install a new dependency and save to the bpm.json. The repository being installed must contain a bpm.json file
 The url parameter can be a relative URL or a full URL. The relative URL will be relative to the specified remote or origin by default
 
-    bpm install [url] [commit] [--remote=origin]
+    bpm install [url] [--remote=origin]
 
 Example:
 
     bpm install ../mortar.git
-    bpm install ../mortar.git ad2c7c47362fc682079307cbb1db7ef944997364
     bpm install ../mortar.git --remote=brandon
     bpm install https://neudesic.timu.com/projects/timu/code/master/mortar.git
 
-The version number in the bpm.json will be incremented automatically when the install command is used. If the commit is not specified then the last commit hash will be used.
+The version number in the bpm.json will be incremented automatically when the install command is used.
 
-Update the commit of existing dependency to the latest
+Update the dependency to the latest
 
     bpm update [dependencyName] [--remote=myremote | --root=mypath] [--recursive]
 
@@ -112,14 +110,9 @@ Example:
     bpm update mortar
     bpm update mortar --remote=brandon
     bpm update mortar --root=../mydependencies
-    bpm update mortar --root=../mydependencies --recursive
+    bpm update mortar --root=../mydependencies
 
 The version number in the bpm.json will be incremented automatically when a dependency has changed.
-
-When using the `--root` option, uncommited local changes are always copied to bpm_modules. If the repository contains outstanding changes, then the commit hash of the dependency will be updated to 'local', which is obviously invalid. This is to let the developer know that they need to finalize the dependency commit. To finalize, it is expected that local changes will be committed and then by running the update command again, and if there are no detected changes, then the commit hash will be updated to the latest.
-
-The --recursive option only works when specified with the --root option. bpm will recursively go through all dependencies and update the commit hashes based on the last local commit hash for the dependency. The version number of sub-dependencies are also incremented.
-
 
 Uninstall a dependency.
 Removed the dependency from bpm_modules and performs an npm uninstall [depName]
@@ -152,12 +145,10 @@ my-component bpm.json
         "version" : "1.0.0",
         "dependencies" : {
             "my-depencency-1" : {
-                "url" : "../my-depencency-1.git",
-                "commit" : "90b0a2da501451cf55ee07f9faeb3f8707af6011"
+                "url" : "../my-depencency-1.git"
             },
             "my-depencency-2":{
-                "url" :"../my-dependency-2.git",
-                "commit" :"d5f3dfd6625ba0c92709198c319ec2276471610e"
+                "url" :"../my-dependency-2.git"
             }
         }
     }
@@ -169,8 +160,7 @@ my-depencency-1 bpm.json
         "version" : "1.0.1",
         "dependencies" : {
             "my-depencency-2" : {
-                "url" : "../my-depencency-2.git",
-                "commit" : "d5f3dfd6625ba0c92709198c319ec2276471610e"
+                "url" : "../my-depencency-2.git"
             }
         }
     }
@@ -200,21 +190,12 @@ When bpm is run a bpm_modules folder will be created which contains copies of th
         bpm.json
         bpm_modules\
             my-depencency-1\
-                    90b0a2da501451cf55ee07f9faeb3f8707af6011\
             my-depencency-2\
-                    d5f3dfd6625ba0c92709198c319ec2276471610e\
         node_modules\
             my-depencency-1\
             my-depencency-2\
         src\
             main.js
-
-
-When the bpm command is run with the --root option, then the bpm_modules dependencies folders will contain a local folders
-
-    bpm_modules\
-        my-depencency-1\
-            local\
 
 
 bpm module cache

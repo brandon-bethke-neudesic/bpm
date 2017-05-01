@@ -3,7 +3,6 @@ package main;
 import (
     "github.com/blang/semver"
     "fmt"
-    "strings"
     "os"
     "path"
     "io/ioutil"
@@ -29,13 +28,13 @@ func (r *ModuleCache) Install() (error) {
 }
 
 func (r *ModuleCache) NpmInstall() (error){
-    fmt.Println("Npm installing dependencies to node_modules...")
+    fmt.Println("Npm is installing dependencies to node_modules...")
     workingPath,_ := os.Getwd();
     npm := NpmExec{Path: workingPath}
     // Go through each item in the bpm memory cache. There is suppose to only be one item per dependency
     for depName := range r.Items {
-        fmt.Println("Processing cached dependency", depName)
         depItem := r.Items[depName];
+        fmt.Println("Npm is installing " + depName + " to node_modules...")
         // Perform the npm install and pass the url of the dependency. npm install ./bpm_modules/mydep
         err := npm.InstallUrl(depItem.Path)
         if err != nil {
@@ -131,28 +130,7 @@ func (r *ModuleCache) AddLatest(item *ModuleCacheItem) (bool, error) {
         return r.Add(item), nil;
     }
 
-    // If the existing cache item is a 'local' item, then the local item always has priority and there is no need to resolve any conflicts
-    if strings.HasSuffix(existingItem.Path, "/" + Options.LocalModuleName) {
-        return false, nil;
-    }
-
-    // If the new item is a 'local' item, then the local item always has priority and just add it.
-    if strings.HasSuffix(item.Path, "/" + Options.LocalModuleName) {
-        return r.Add(item), nil
-    }
-
-    if Options.ConflictResolutionType == "revisionlist" {
-        fmt.Println("Attempting to determine which commit is the ancestor...")
-        // If commitB is printed, then commitA is an ancestor of commit B
-        //"git rev-list <commitA> | grep $(git rev-parse <commitB>)"
-        git := GitExec{Path: item.Path}
-        result := git.DetermineAncestor(item.Commit, existingItem.Commit)
-        if result == item.Commit {
-            fmt.Println("The commit " + item.Commit + " is an ancestor of the existing cache item. Replacing existing item with new item.")
-        } else {
-            return false, nil
-        }
-    } else if Options.ConflictResolutionType == "versioning" {
+    if Options.ConflictResolutionType == "versioning" {
         v1, err := semver.Make(existingItem.Version)
         if err != nil {
             fmt.Println("Warning: There was a problem reading the version")
@@ -167,9 +145,6 @@ func (r *ModuleCache) AddLatest(item *ModuleCacheItem) (bool, error) {
         if versionCompareResult == -1 {
             fmt.Println("Ignoring lower version of ", item.Name);
             return false, nil;
-        } else if versionCompareResult == 0 && strings.Compare(existingItem.Commit, item.Commit) != 0 {
-            fmt.Println("Conflict. The version number is the same, but the commit hash is different. Ignoring")
-            return false, nil
         } else if versionCompareResult == 1 {
             fmt.Println("The version number is greater and this version of the module will be used.")
         } else {

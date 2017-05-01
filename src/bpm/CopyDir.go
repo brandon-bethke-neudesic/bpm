@@ -14,7 +14,7 @@ type CopyDir struct {
 }
 
 // Copies file source to destination dest.
-func (cp *CopyDir) CopyFile(source string, dest string) (err error) {
+func (cp *CopyDir) CopyFile(source string, dest string) (error) {
 	sf, err := os.Open(source)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func (cp *CopyDir) CopyFile(source string, dest string) (err error) {
 		}
 
 	}
-	return
+	return nil
 }
 
 

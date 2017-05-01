@@ -1,11 +1,11 @@
 package main;
 
 import (
-    "os"
     "fmt"
     "path"
     "strings"
     "bpmerror"
+    "errors"
 )
 
 type LsCommand struct {
@@ -44,27 +44,17 @@ func (cmd *LsCommand) PrintDependencies(bpm BpmData, indentLevel int) {
         if item.Url == "" {
             fmt.Println("Error: No url specified for " + itemName)
         }
-        if item.Commit == "" {
-            fmt.Println("Error: No commit specified for " + itemName)
-        }
         cmd.IndentAndPrintTree(indentLevel, "")
-        workingPath,_ := os.Getwd();
         itemPath := path.Join(Options.BpmCachePath, itemName)
-        itemClonePath := path.Join(workingPath, itemPath, item.Commit)
-        localPath := path.Join(Options.BpmCachePath, itemName, Options.LocalModuleName)
-        if PathExists(localPath) {
-            itemClonePath = localPath;
-            cmd.IndentAndPrintTree(indentLevel, "--" + itemName + " @ [Local]")
-        } else if !PathExists(itemClonePath) {
-            cmd.IndentAndPrintTree(indentLevel, "--" + itemName + " @ " + item.Commit + " [MISSING]")
-            continue
+        if PathExists(itemPath) {
+            cmd.IndentAndPrintTree(indentLevel, "--" + itemName + " [Installed]")
         } else {
-            cmd.IndentAndPrintTree(indentLevel, "--" + itemName + " @ " + item.Commit + " [Installed]")
+            cmd.IndentAndPrintTree(indentLevel, "--" + itemName + " [MISSING]")
         }
 
         // Recursively get dependencies in the current dependency
         moduleBpm := BpmData{};
-        moduleBpmFilePath := path.Join(itemClonePath, Options.BpmFileName)
+        moduleBpmFilePath := path.Join(itemPath, Options.BpmFileName)
         err := moduleBpm.LoadFile(moduleBpmFilePath);
         if err != nil {
             cmd.IndentAndPrint(indentLevel, "Error: Could not load the bpm.json file for dependency " + itemName)
@@ -88,13 +78,11 @@ func (cmd *LsCommand) PrintDependencies(bpm BpmData, indentLevel int) {
 }
 
 func (cmd *LsCommand) Execute() (error) {
-    err := Options.DoesBpmFileExist();
-    if err != nil {
-        return err;
+    if !Options.BpmFileExists() {
+        return errors.New("Error: The " + Options.BpmFileName + " file does not exist.");
     }
-
     bpm := BpmData{};
-    err = bpm.LoadFile(Options.BpmFileName);
+    err := bpm.LoadFile(Options.BpmFileName);
     if err != nil {
         return bpmerror.New(err, "Error: There was a problem loading the bpm.json file")
     }

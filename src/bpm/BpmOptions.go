@@ -5,7 +5,6 @@ import (
     "path"
     "fmt"
     "os"
-    "errors"
     "bpmerror"
 )
 
@@ -35,11 +34,11 @@ func (options *BpmOptions) EnsureBpmCacheFolder() {
     }
 }
 
-func (options *BpmOptions) DoesBpmFileExist() (error) {
+func (options *BpmOptions) BpmFileExists() (bool) {
     if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
-        return errors.New("Error: The " + Options.BpmFileName + " file does not exist.");
+        return false
     }
-    return nil
+    return true
 }
 
 func (options *BpmOptions) getSubCommand(args []string) (SubCommand){
@@ -78,8 +77,6 @@ func (options *BpmOptions) getSubCommand(args []string) (SubCommand){
 func (options *BpmOptions) Parse(args []string) {
     options.Command = options.getSubCommand(args)
     options.SkipNpmInstall = options.GetBoolOption(args, "--skipnpm")
-    options.Recursive = options.GetBoolOption(args, "--recursive")
-    options.ConflictResolutionType = options.GetNameValueOption(args, "--resolution=", "versioning")
     options.UseRemoteName = options.GetNameValueOption(args, "--remote=", "origin")
     options.UseRemoteUrl = options.GetNameValueOption(args, "--remoteurl=", "")
     options.UseLocalPath = options.GetRootOption(args);

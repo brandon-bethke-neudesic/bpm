@@ -6,6 +6,7 @@ import (
     "path"
     "strings"
     "bpmerror"
+    "errors"
 )
 
 
@@ -25,58 +26,12 @@ func (cmd *UpdateCommand) getUpdateModuleName() (string){
     return "";
 }
 
-func DetermineLocalCommitValue(source string) (string, error) {
-    // Put the commit as local, since we don't really know what it should be.
-    // It's expected that the bpm install will fail if the commit is 'local' which will indicate to the user that they
-    // didn't finalize configuring the dependency
-    // However if the repo has no changes, then grab the commit
-    commit := "local"
-    git := GitExec{Path:source}
-    if Options.Finalize || !git.HasChanges() {
-        var err error;
-        commit, err = git.GetLatestCommit()
-        if err != nil {
-            return "", err;
-        }
-    }
-    return commit, nil
-}
-
-func updateRecursiveLocalItems(itemProcessed *ItemProcessed) error {
-    // Only update and save the bpm if the recursive option is set.
-    if !Options.Recursive || !itemProcessed.Local {
-        return nil;
-    }
-    commit, err := DetermineLocalCommitValue(itemProcessed.Source)
-    if err != nil {
-        return bpmerror.New(err, "Error: There was an issue getting the latest commit for " + itemProcessed.Name)
-    }
-    newItem := &BpmDependency{Url: itemProcessed.Item.Url, Commit:commit}
-    existingItem := itemProcessed.Bpm.Dependencies[itemProcessed.Name];
-    if !existingItem.Equal(newItem) {
-        itemProcessed.Bpm.Dependencies[itemProcessed.Name] = newItem;
-        filePath := path.Join(Options.UseLocalPath, itemProcessed.Bpm.Name, Options.BpmFileName);
-        cachePath := path.Join(itemProcessed.Cache, Options.BpmFileName);
-        err = itemProcessed.Bpm.IncrementVersion();
-        if err != nil {
-            return err;
-        }
-        err = itemProcessed.Bpm.WriteFile(filePath)
-        if err != nil {
-            return err;
-        }
-        err = itemProcessed.Bpm.WriteFile(cachePath)
-    }
-    return nil;
-}
-
 func (cmd *UpdateCommand) Execute() (error) {
-    err := Options.DoesBpmFileExist();
-    if err != nil {
-        return err;
+    if !Options.BpmFileExists() {
+        return errors.New("Error: The " + Options.BpmFileName + " file does not exist.");
     }
     bpm := BpmData{};
-    err = bpm.LoadFile(Options.BpmFileName);
+    err := bpm.LoadFile(Options.BpmFileName);
     if err != nil {
         return bpmerror.New(nil, "Error: There was a problem loading the bpm.json file")
     }
@@ -90,6 +45,7 @@ func (cmd *UpdateCommand) Execute() (error) {
         return bpmerror.New(err, "Error: Could not find module " + bpmModuleName + " in the dependencies")
     }
 
+    fmt.Println("Processing dependencies for", bpm.Name, "version", bpm.Version);
     // Always process the keys sorted by name so the installation is consistent
     sortedKeys := bpm.GetSortedKeys();
     for _, updateModule := range sortedKeys {
@@ -100,22 +56,18 @@ func (cmd *UpdateCommand) Execute() (error) {
         }
         if Options.UseLocalPath != "" && strings.Index(depItem.Url, "http") == -1 {
             moduleSourceUrl := path.Join(Options.UseLocalPath, updateModule);
-            fmt.Println("Processing local dependency in", moduleSourceUrl)
-            commit, err := DetermineLocalCommitValue(moduleSourceUrl)
-            if err != nil {
-                return bpmerror.New(err, "Error: There was an issue getting the latest commit for " + updateModule)
-            }
-            moduleBpm, cacheItem, err := ProcessLocalModule(moduleSourceUrl)
+            moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl)
             if err != nil {
                 return err;
             }
             moduleCache.Add(cacheItem)
-            err = ProcessDependencies(moduleBpm, "", updateRecursiveLocalItems)
+            fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
+            err = ProcessDependencies(moduleBpm, "")
             if err != nil {
                 return err;
             }
 
-            newItem := &BpmDependency{Url: depItem.Url, Commit:commit}
+            newItem := &BpmDependency{Url: depItem.Url, Commit:"local"}
             bpm.Dependencies[updateModule] = newItem;
 
         } else {
@@ -124,37 +76,29 @@ func (cmd *UpdateCommand) Execute() (error) {
             if err != nil {
                 return err;
             }
-            moduleBpm, cacheItem, err := ProcessRemoteModule(itemRemoteUrl, "master")
+            moduleBpm, cacheItem, err := ProcessModule(itemRemoteUrl)
             if err != nil {
                 return err;
             }
             moduleCache.Add(cacheItem)
+            fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
             if Options.UseParentUrl {
-                err = ProcessDependencies(moduleBpm, itemRemoteUrl, nil)
+                err = ProcessDependencies(moduleBpm, itemRemoteUrl)
             } else {
-                err = ProcessDependencies(moduleBpm, "", nil)                
+                err = ProcessDependencies(moduleBpm, "")
             }
             if err != nil {
                 return err;
             }
-            newItem := &BpmDependency{Url: depItem.Url, Commit:cacheItem.Commit}
+            newItem := &BpmDependency{Url: depItem.Url, Commit:"local"}
             bpm.Dependencies[updateModule] = newItem;
         }
     }
-    moduleCache.Trim();
     if !Options.SkipNpmInstall {
         err = moduleCache.Install()
         if err != nil {
             return bpmerror.New(err, "Error: There was an issue performing npm install on the dependencies")
         }
-    }
-    err = bpm.IncrementVersion();
-    if err != nil {
-        return err;
-    }
-    err = bpm.WriteFile(path.Join(Options.WorkingDir, Options.BpmFileName));
-    if err != nil {
-        return err;
     }
     return nil;
 }
