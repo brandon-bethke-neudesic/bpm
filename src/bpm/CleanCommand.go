@@ -7,14 +7,14 @@ import (
     "bpmerror"
     "errors"
     "io/ioutil"
+    "github.com/spf13/cobra"
 )
 
 type CleanCommand struct {
+    Args []string
+    TrimOption bool
 }
 
-func (cmd *CleanCommand) Name() string {
-    return "clean"
-}
 
 func (cmd *CleanCommand) Trim() (error) {
     if !Options.BpmFileExists() {
@@ -61,7 +61,7 @@ func (cmd *CleanCommand) Clean() (error) {
 
 
 func (cmd *CleanCommand) Execute() (error) {
-    if Options.Trim {
+    if cmd.TrimOption {
         return cmd.Trim();
     }
     return cmd.Clean();
@@ -124,4 +124,34 @@ func (tc *CleanCache) Build(bpm *BpmData) (error) {
         return tc.Build(moduleBpm);
     }
     return nil
+}
+
+func (cmd *CleanCommand) Initialize() (error) {
+    return nil;
+}
+
+func NewCleanCommand() *cobra.Command {
+    myCmd := &CleanCommand{}
+    cmd := &cobra.Command{
+        Use:   "clean",
+        Short: "remove all modules from bpm_modules",
+        Long:  "remove all modules from bpm_modules",
+        PreRunE: func(cmd *cobra.Command, args []string) error {
+            myCmd.Args = args;
+            return myCmd.Initialize();
+        },
+        Run: func(cmd *cobra.Command, args []string) {
+            Options.Command = "clean"
+            err := myCmd.Execute();
+            if err != nil {
+                fmt.Println(err);
+                fmt.Println("Finished with errors");
+                os.Exit(1)
+            }
+        },
+    }
+
+    flags := cmd.Flags();
+    flags.BoolVar(&myCmd.TrimOption, "tim", false, "")
+    return cmd
 }

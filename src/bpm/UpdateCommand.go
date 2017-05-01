@@ -7,23 +7,20 @@ import (
     "strings"
     "bpmerror"
     "errors"
+    "github.com/spf13/cobra"
 )
 
 
 type UpdateCommand struct {
+    Args []string
+    Name string
 }
 
-func (cmd *UpdateCommand) Name() string {
-    return "update"
-}
-
-func (cmd *UpdateCommand) getUpdateModuleName() (string){
-    // The next parameter after the 'uninstall' must to be the module name
-    index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "update" });
-    if len(os.Args) > index + 1 && strings.Index(os.Args[index + 1], "--") != 0 {
-        return os.Args[index + 1];
+func (cmd *UpdateCommand) Initialize() (error) {
+    if len(cmd.Args) > 1 {
+        cmd.Name = cmd.Args[1];
     }
-    return "";
+    return nil;
 }
 
 func (cmd *UpdateCommand) Execute() (error) {
@@ -40,9 +37,8 @@ func (cmd *UpdateCommand) Execute() (error) {
         return nil;
     }
 
-    bpmModuleName := cmd.getUpdateModuleName()
-    if bpmModuleName != "" && !bpm.HasDependency(bpmModuleName) {
-        return bpmerror.New(err, "Error: Could not find module " + bpmModuleName + " in the dependencies")
+    if cmd.Name != "" && !bpm.HasDependency(cmd.Name) {
+        return bpmerror.New(err, "Error: Could not find module " + cmd.Name + " in the dependencies")
     }
 
     fmt.Println("Processing dependencies for", bpm.Name, "version", bpm.Version);
@@ -51,7 +47,7 @@ func (cmd *UpdateCommand) Execute() (error) {
     for _, updateModule := range sortedKeys {
         depItem := bpm.Dependencies[updateModule]
         // If a specific module name was specified then skip the others.
-        if bpmModuleName != "" && bpmModuleName != updateModule {
+        if cmd.Name != "" && cmd.Name != updateModule {
             continue;
         }
         if Options.UseLocalPath != "" && strings.Index(depItem.Url, "http") == -1 {
@@ -101,4 +97,28 @@ func (cmd *UpdateCommand) Execute() (error) {
         }
     }
     return nil;
+}
+
+func NewUpdateCommand() *cobra.Command {
+    myCmd := &UpdateCommand{}
+    cmd := &cobra.Command{
+        Use:   "update [NAME]",
+        Short: "update the specified component",
+        Long:  "update the specified component",
+        PreRunE: func(cmd *cobra.Command, args []string) error {
+            myCmd.Args = args;
+            return myCmd.Initialize();
+        },
+        Run: func(cmd *cobra.Command, args []string) {
+            Options.Command = "update"
+
+            err := myCmd.Execute();
+            if err != nil {
+                fmt.Println(err);
+                fmt.Println("Finished with errors");
+                os.Exit(1)
+            }
+        },
+    }
+    return cmd
 }

@@ -6,15 +6,14 @@ import (
     "strings"
     "bpmerror"
     "errors"
+    "github.com/spf13/cobra"
+    "os"
 )
 
 type LsCommand struct {
-    BpmModuleName string
+    Args []string
 }
 
-func (cmd *LsCommand) Name() string {
-    return "ls"
-}
 
 func (cmd *LsCommand) IndentAndPrintTree(indentLevel int, mytext string){
     text := "|"
@@ -96,4 +95,31 @@ func (cmd *LsCommand) Execute() (error) {
     cmd.PrintDependencies(bpm, 0)
     fmt.Println("")
     return nil;
+}
+
+func (cmd *LsCommand) Initialize() (error) {
+    return nil;
+}
+
+func NewLsCommand() *cobra.Command {
+    myCmd := &LsCommand{}
+    cmd := &cobra.Command{
+        Use:   "ls",
+        Short: "list the dependencies",
+        Long:  "list the dependencies",
+        PreRunE: func(cmd *cobra.Command, args []string) error {
+            myCmd.Args = args;
+            return myCmd.Initialize();
+        },
+        Run: func(cmd *cobra.Command, args []string) {
+            Options.Command = "ls"
+            err := myCmd.Execute();
+            if err != nil {
+                fmt.Println(err);
+                fmt.Println("Finished with errors");
+                os.Exit(1)
+            }
+        },
+    }
+    return cmd
 }

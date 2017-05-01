@@ -7,15 +7,15 @@ import (
     "bpmerror"
     "path"
     "errors"
+    "github.com/spf13/cobra"
 )
 
 
 type InstallCommand struct {
+    Args []string
+    InstallItem string
 }
 
-func (cmd *InstallCommand) Name() string {
-    return "install"
-}
 
 func (cmd *InstallCommand) installNew(moduleUrl string) (error) {
     bpm := BpmData{};
@@ -118,15 +118,40 @@ func (cmd *InstallCommand) build(installItem string) (error) {
     return nil;
 }
 
-func (cmd *InstallCommand) Execute() (error) {
-    index := SliceIndex(len(os.Args), func(i int) bool { return os.Args[i] == "install" });
-    installItem := "";
-    if len(os.Args) > index + 1 && strings.Index(os.Args[index + 1], "--") != 0 {
-        installItem = os.Args[index + 1];
+func (cmd *InstallCommand) Initialize() (error) {
+    if len(cmd.Args) > 1 {
+        cmd.InstallItem = cmd.Args[1];
     }
+    return nil;
+}
 
-    if installItem != "" || strings.HasSuffix(installItem, ".git") {
-        return cmd.installNew(installItem);
+func (cmd *InstallCommand) Execute() (error) {
+    if cmd.InstallItem != "" || strings.HasSuffix(cmd.InstallItem, ".git") {
+        return cmd.installNew(cmd.InstallItem);
     }
-    return cmd.build(installItem);
+    return cmd.build(cmd.InstallItem);
+}
+
+
+func NewInstallCommand() *cobra.Command {
+    myCmd := &InstallCommand{}
+    cmd := &cobra.Command{
+        Use:   "install [URL]",
+        Short: "install the specified item or all the dependencies",
+        Long:  "install the specified item or all the dependencies",
+        PreRunE: func(cmd *cobra.Command, args []string) error {
+            myCmd.Args = args;
+            return myCmd.Initialize();
+        },
+        Run: func(cmd *cobra.Command, args []string) {
+            Options.Command = "install"
+            err := myCmd.Execute();
+            if err != nil {
+                fmt.Println(err);
+                fmt.Println("Finished with errors");
+                os.Exit(1)
+            }
+        },
+    }
+    return cmd
 }

@@ -150,7 +150,7 @@ func ProcessModule(source string) (*BpmData, *ModuleCacheItem, error) {
     itemPath := path.Join(Options.BpmCachePath, itemName);
 
     if PathExists(itemPath) {
-        if Options.Command.Name() == "update" {
+        if Options.Command == "update" {
 
             git := GitExec{Path: itemPath}
             //if Options.UseLocalPath != "" && strings.Index(source, "http") == -1 {
@@ -257,7 +257,7 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
     sortedKeys := bpm.GetSortedKeys();
     for _, itemName := range sortedKeys {
 
-        if Options.Command.Name() == "install" {
+        if Options.Command == "install" {
             // Do not process the item if it has already been processed
             _, exists := moduleCache.Items[itemName];
             if exists {
@@ -346,16 +346,12 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
 }
 
 func main() {
-    Options.Parse(os.Args);
-    err := Options.Validate();
-    if err == nil {
-        err = Options.Command.Execute();
-    }
-    if err != nil {
-        fmt.Println(err)
-        fmt.Println("Finished with errors")
+    Options.WorkingDir, _ = os.Getwd();
+    cmd := NewBpmCommand();
+    if err := cmd.Execute(); err != nil {
+        fmt.Println(err);
+        fmt.Println("Finished with errors");
         os.Exit(1)
     }
-    fmt.Println("Finished")
-    os.Exit(0)
+    os.Exit(0);
 }
