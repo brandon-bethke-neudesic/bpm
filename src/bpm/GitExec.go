@@ -16,7 +16,7 @@ func (git *GitExec) IsGitRepo() bool {
     return PathExists(".git")
 }
 
-func (git *GitExec) LsFiles() ([]string, error) {
+func (git *GitExec) getChangedFiles() ([]string, error) {
     files := make([]string, 0);
 
     gitCommand := "git diff-index --name-only HEAD --"
@@ -46,15 +46,22 @@ func (git *GitExec) LsFiles() ([]string, error) {
     for lineScanner.Scan() {
         files = append(files, lineScanner.Text());
     }
+    return files, nil;
+}
 
-    // Remove deleted files from the list
-    gitCommand = "git ls-files -d"
-    rc = OsExec{Dir: git.Path, LogOutput: git.LogOutput}
-    output, err = rc.Run(gitCommand)
+func (git *GitExec) LsFiles() ([]string, error) {
+    files, err := git.getChangedFiles();
     if err != nil {
         return nil, err;
     }
-    lineScanner = bufio.NewScanner(strings.NewReader(output))
+    // Remove deleted files from the list
+    gitCommand := "git ls-files -d"
+    rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
+    output, err := rc.Run(gitCommand)
+    if err != nil {
+        return nil, err;
+    }
+    lineScanner := bufio.NewScanner(strings.NewReader(output))
     for lineScanner.Scan() {
         for i, item := range files {
             if item == lineScanner.Text() {
@@ -82,16 +89,11 @@ func (git *GitExec) DeletedFiles() ([]string, error) {
 }
 
 func (git *GitExec) HasChanges() bool {
-    rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
-    stdOut, err := rc.Run("git diff-index HEAD --")
+    files, err := git.getChangedFiles();
     if err != nil {
         return false;
     }
-    if strings.TrimSpace(stdOut) == "" {
-        return false;
-    } else {
-        return true;
-    }
+    return len(files) > 0
 }
 
 // If commitB is printed, then commitA is an ancestor of commit B
@@ -182,7 +184,7 @@ func (git *GitExec) GetLatestCommit() (string, error) {
     if err != nil {
         return "", err;
     }
-    return stdOut, nil;
+    return strings.TrimSpace(stdOut), nil;
 }
 
 func (git *GitExec) Init() error {
@@ -190,6 +192,13 @@ func (git *GitExec) Init() error {
     rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
     _, err := rc.Run(gitCommand);
     return err;
+}
+
+func (git *GitExec) GetCurrentBranch() (string, error) {
+    gitCommand := "git rev-parse --abbrev-ref HEAD"
+    rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
+    output, err := rc.Run(gitCommand)
+    return strings.TrimSpace(output), err;
 }
 
 func (git *GitExec) DeleteRemote(name string) {
@@ -205,6 +214,13 @@ func (git *GitExec) AddRemote(name string, url string) error {
     return err;
 }
 
+func (git *GitExec) Fetch(param string) error {
+    gitCommand := "git fetch " + param
+    rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
+    _, err := rc.Run(gitCommand);
+    return err
+}
+
 func (git *GitExec) InitAndFetch(url string) error {
     err := git.Init();
     if err != nil {
@@ -214,10 +230,11 @@ func (git *GitExec) InitAndFetch(url string) error {
     if err != nil {
         return err;
     }
-    gitCommand := "git fetch --all"
-    rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
-    _, err = rc.Run(gitCommand);
-    return err
+    err = git.Fetch("--all");
+    if err != nil {
+        return err;
+    }
+    return nil;
 }
 
 func (git *GitExec) Checkout(name string) (error) {

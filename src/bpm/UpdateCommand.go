@@ -50,7 +50,7 @@ func (cmd *UpdateCommand) Execute() (error) {
         }
         moduleSourceUrl, err := MakeRemoteUrl(depItem.Url)
         parentUrl := "";
-        moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl)
+        moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl, depItem.Commit)
         if err != nil {
             return err;
         }
@@ -64,7 +64,7 @@ func (cmd *UpdateCommand) Execute() (error) {
         if err != nil {
             return err;
         }
-        newItem := &BpmDependency{Url: depItem.Url}
+        newItem := &BpmDependency{Url: depItem.Url, Commit: cacheItem.Commit}
         bpm.Dependencies[updateModule] = newItem;
 
     }
@@ -74,6 +74,16 @@ func (cmd *UpdateCommand) Execute() (error) {
             return bpmerror.New(err, "Error: There was an issue performing npm install on the dependencies")
         }
     }
+
+    err = bpm.IncrementVersion();
+    if err != nil {
+        return err;
+    }
+    err = bpm.WriteFile(Options.BpmFileName)
+    if err != nil {
+        return err;
+    }
+
     return nil;
 }
 

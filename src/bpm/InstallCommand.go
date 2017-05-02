@@ -13,10 +13,11 @@ import (
 type InstallCommand struct {
     Args []string
     InstallItem string
+    Commit string
 }
 
 
-func (cmd *InstallCommand) installNew(moduleUrl string) (error) {
+func (cmd *InstallCommand) installNew(moduleUrl string, commit string) (error) {
     bpm := BpmData{};
     if !Options.BpmFileExists() {
         return errors.New("Error: The " + Options.BpmFileName + " file does not exist.");
@@ -33,7 +34,7 @@ func (cmd *InstallCommand) installNew(moduleUrl string) (error) {
     }
     parentUrl := "";
     fmt.Println("Processing dependency at", moduleSourceUrl)
-    moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl)
+    moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl, commit)
     if err != nil {
         return err;
     }
@@ -107,7 +108,7 @@ func (cmd *InstallCommand) Initialize() (error) {
 
 func (cmd *InstallCommand) Execute() (error) {
     if cmd.InstallItem != "" || strings.HasSuffix(cmd.InstallItem, ".git") {
-        return cmd.installNew(cmd.InstallItem);
+        return cmd.installNew(cmd.InstallItem, cmd.Commit);
     }
     return cmd.build(cmd.InstallItem);
 }
@@ -133,5 +134,9 @@ func NewInstallCommand() *cobra.Command {
             }
         },
     }
+
+    flags := cmd.Flags();
+    flags.StringVar(&myCmd.Commit, "commit", "latest", "The commit value")
+
     return cmd
 }
