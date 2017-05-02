@@ -15,8 +15,8 @@ type UpdateCommand struct {
 }
 
 func (cmd *UpdateCommand) Initialize() (error) {
-    if len(cmd.Args) > 1 {
-        cmd.Name = cmd.Args[1];
+    if len(cmd.Args) > 0 {
+        cmd.Name = cmd.Args[0];
     }
     return nil;
 }
@@ -108,5 +108,8 @@ func NewUpdateCommand() *cobra.Command {
             }
         },
     }
+
+    flags := cmd.Flags();
+    flags.StringVar(&Options.ConflictResolutionType, "resolution", "revisionlist", "")
     return cmd
 }

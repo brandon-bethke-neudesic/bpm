@@ -100,8 +100,8 @@ func (cmd *InstallCommand) build(installItem string) (error) {
 }
 
 func (cmd *InstallCommand) Initialize() (error) {
-    if len(cmd.Args) > 1 {
-        cmd.InstallItem = cmd.Args[1];
+    if len(cmd.Args) > 0 {
+        cmd.InstallItem = cmd.Args[0];
     }
     return nil;
 }
@@ -137,6 +137,7 @@ func NewInstallCommand() *cobra.Command {
 
     flags := cmd.Flags();
     flags.StringVar(&myCmd.Commit, "commit", "latest", "The commit value")
+    flags.StringVar(&Options.ConflictResolutionType, "resolution", "revisionlist", "")
 
     return cmd
 }
