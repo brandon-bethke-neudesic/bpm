@@ -157,7 +157,7 @@ func ProcessModule(source string) (*BpmData, *ModuleCacheItem, error) {
                 // Remove any uncommited changes
                 err := git.Checkout(".");
                 if err != nil {
-                    return nil, nil, err;
+                    return nil, nil, bpmerror.New(err, "Error: There was an issue trying to remove all uncommited changes in " + itemPath);
                 }
             //}
 
@@ -188,7 +188,13 @@ func ProcessModule(source string) (*BpmData, *ModuleCacheItem, error) {
         }
     } else {
         git := GitExec{LogOutput: true}
-        err := git.Clone(source, itemPath);
+
+        cloneUrl := source;
+        if !strings.HasSuffix(cloneUrl, ".git") && (Options.UseLocalPath == "" || strings.HasPrefix(cloneUrl, "http")) {
+            cloneUrl = cloneUrl + ".git";
+        }
+
+        err := git.Clone(cloneUrl, itemPath);
         if err != nil {
             return nil, nil, err;
         }
@@ -213,11 +219,16 @@ func ProcessModule(source string) (*BpmData, *ModuleCacheItem, error) {
         fmt.Println("Error: Could not read the version");
         return nil, nil, err;
     }
-    cacheItem := &ModuleCacheItem{Name:itemName, Version: moduleBpmVersion.String(), Commit: "local", Path: itemPath}
+    cacheItem := &ModuleCacheItem{Name:itemName, Version: moduleBpmVersion.String(), Path: itemPath}
     return moduleBpm, cacheItem, nil;
 }
 
 func MakeRemoteUrl(itemUrl string) (string, error) {
+    if Options.UseLocalPath != "" && strings.Index(itemUrl, "http") == -1 {
+        _, name := filepath.Split(itemUrl)
+        return path.Join(Options.UseLocalPath, strings.Split(name, ".git")[0]), nil;
+    }
+
     adjustedUrl := itemUrl;
     if adjustedUrl == "" {
         // If a remote url is specified then use that one, otherwise determine the url of the specified remote name.
@@ -257,13 +268,13 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
     sortedKeys := bpm.GetSortedKeys();
     for _, itemName := range sortedKeys {
 
-        if Options.Command == "install" {
+        //if Options.Command == "install" {
             // Do not process the item if it has already been processed
             _, exists := moduleCache.Items[itemName];
             if exists {
                 continue;
             }
-        }
+        //}
 
         item := bpm.Dependencies[itemName]
         err := item.Validate();
@@ -328,7 +339,7 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
             if err != nil {
                 return bpmerror.New(err, "Error: There is an issue with the bpm.json file for " + itemName)
             }
-            cacheItem := &ModuleCacheItem{Name:itemName, Version: moduleBpm.Version, Commit: "local", Path: itemPath}
+            cacheItem := &ModuleCacheItem{Name:itemName, Version: moduleBpm.Version, Path: itemPath}
             moduleCache.AddLatest(cacheItem)
 
             fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);

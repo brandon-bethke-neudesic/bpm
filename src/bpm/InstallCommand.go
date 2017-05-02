@@ -5,7 +5,6 @@ import (
     "fmt"
     "strings"
     "bpmerror"
-    "path"
     "errors"
     "github.com/spf13/cobra"
 )
@@ -28,44 +27,26 @@ func (cmd *InstallCommand) installNew(moduleUrl string) (error) {
     }
     Options.EnsureBpmCacheFolder();
 
-    if Options.UseLocalPath != "" && strings.Index(moduleUrl, "http") == -1 {
-        moduleSourceUrl := path.Join(Options.UseLocalPath, moduleUrl);
-        fmt.Println("Processing dependency at", moduleSourceUrl)
-        moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl)
-        if err != nil {
-            return err;
-        }
-        moduleCache.Add(cacheItem)
-        err = ProcessDependencies(moduleBpm, "")
-        if err != nil {
-            return err;
-        }
-
-        newItem := &BpmDependency{Url: moduleUrl, Commit:"local"}
-        bpm.Dependencies[moduleBpm.Name] = newItem;
-
-    } else {
-        itemRemoteUrl, err := MakeRemoteUrl(moduleUrl)
-        if err != nil {
-            return err;
-        }
-        fmt.Println("Processing dependency at", itemRemoteUrl)
-        moduleBpm, cacheItem, err := ProcessModule(itemRemoteUrl)
-        if err != nil {
-            return err;
-        }
-        moduleCache.Add(cacheItem)
-        if Options.UseParentUrl {
-            err = ProcessDependencies(moduleBpm, itemRemoteUrl)
-        } else {
-            err = ProcessDependencies(moduleBpm, "")
-        }
-        if err != nil {
-            return err;
-        }
-        newItem := &BpmDependency{Url: moduleUrl, Commit:"local"}
-        bpm.Dependencies[moduleBpm.Name] = newItem;
+    moduleSourceUrl, err := MakeRemoteUrl(moduleUrl);
+    if err != nil {
+        return err;
     }
+    parentUrl := "";
+    fmt.Println("Processing dependency at", moduleSourceUrl)
+    moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl)
+    if err != nil {
+        return err;
+    }
+    moduleCache.Add(cacheItem)
+    if Options.UseParentUrl {
+        parentUrl = moduleSourceUrl;
+    }
+    err = ProcessDependencies(moduleBpm, parentUrl)
+    if err != nil {
+        return err;
+    }
+    newItem := &BpmDependency{Url: moduleUrl}
+    bpm.Dependencies[moduleBpm.Name] = newItem;
 
     if !Options.SkipNpmInstall{
         err := moduleCache.Install()
@@ -73,7 +54,6 @@ func (cmd *InstallCommand) installNew(moduleUrl string) (error) {
             return err;
         }
     }
-
     err = bpm.IncrementVersion();
     if err != nil {
         return err;

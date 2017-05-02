@@ -110,16 +110,15 @@ func (tc *CleanCache) Build(bpm *BpmData) (error) {
     // Always process the keys sorted by name so the processing is consistent
     sortedKeys := bpm.GetSortedKeys();
     for _, depName := range sortedKeys {
-        depItem := bpm.Dependencies[depName]
         // Delete previous cached items
-        tcItem := &CleanCacheItem{Name: depName, Commit: depItem.Commit}
+        tcItem := &CleanCacheItem{Name: depName}
         tc.Add(tcItem);
         moduleBpm := &BpmData{};
-        moduleBpmFilePath := path.Join(Options.BpmCachePath, depName, depItem.Commit, Options.BpmFileName);
+        moduleBpmFilePath := path.Join(Options.BpmCachePath, depName, Options.BpmFileName);
         // It should be expected that the bpm.json file may not exist and this isn't a fatal error, just move on.
         err := moduleBpm.LoadFile(moduleBpmFilePath);
         if err != nil {
-            return nil;
+            return bpmerror.New(nil, "Error: There was a problem loading the bpm.json file for " + moduleBpmFilePath)
         }
         return tc.Build(moduleBpm);
     }

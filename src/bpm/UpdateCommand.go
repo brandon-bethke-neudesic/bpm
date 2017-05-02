@@ -3,8 +3,6 @@ package main;
 import (
     "fmt"
     "os"
-    "path"
-    "strings"
     "bpmerror"
     "errors"
     "github.com/spf13/cobra"
@@ -50,45 +48,25 @@ func (cmd *UpdateCommand) Execute() (error) {
         if cmd.Name != "" && cmd.Name != updateModule {
             continue;
         }
-        if Options.UseLocalPath != "" && strings.Index(depItem.Url, "http") == -1 {
-            moduleSourceUrl := path.Join(Options.UseLocalPath, updateModule);
-            moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl)
-            if err != nil {
-                return err;
-            }
-            moduleCache.Add(cacheItem)
-            fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
-            err = ProcessDependencies(moduleBpm, "")
-            if err != nil {
-                return err;
-            }
-
-            newItem := &BpmDependency{Url: depItem.Url, Commit:"local"}
-            bpm.Dependencies[updateModule] = newItem;
-
-        } else {
-
-            itemRemoteUrl, err := MakeRemoteUrl(depItem.Url)
-            if err != nil {
-                return err;
-            }
-            moduleBpm, cacheItem, err := ProcessModule(itemRemoteUrl)
-            if err != nil {
-                return err;
-            }
-            moduleCache.Add(cacheItem)
-            fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
-            if Options.UseParentUrl {
-                err = ProcessDependencies(moduleBpm, itemRemoteUrl)
-            } else {
-                err = ProcessDependencies(moduleBpm, "")
-            }
-            if err != nil {
-                return err;
-            }
-            newItem := &BpmDependency{Url: depItem.Url, Commit:"local"}
-            bpm.Dependencies[updateModule] = newItem;
+        moduleSourceUrl, err := MakeRemoteUrl(depItem.Url)
+        parentUrl := "";
+        moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl)
+        if err != nil {
+            return err;
         }
+        moduleCache.Add(cacheItem)
+        if Options.UseParentUrl {
+            parentUrl = moduleSourceUrl;
+        }
+
+        fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
+        err = ProcessDependencies(moduleBpm, parentUrl)
+        if err != nil {
+            return err;
+        }
+        newItem := &BpmDependency{Url: depItem.Url}
+        bpm.Dependencies[updateModule] = newItem;
+
     }
     if !Options.SkipNpmInstall {
         err = moduleCache.Install()
