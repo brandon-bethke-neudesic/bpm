@@ -353,9 +353,9 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
     for _, itemName := range sortedKeys {
 
         //if Options.Command == "install" {
-            // Do not process the item if it has already been processed
-            _, exists := moduleCache.Items[itemName];
-            if exists {
+            // Do not process the item if it has already been processed and is local
+            existingCacheItem, exists := moduleCache.Items[itemName];
+            if exists && existingCacheItem.IsLocal {
                 continue;
             }
         //}

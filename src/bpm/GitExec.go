@@ -195,7 +195,7 @@ func (git *GitExec) Init() error {
 }
 
 func (git *GitExec) GetCurrentBranch() (string, error) {
-    gitCommand := "git rev-parse --abbrev-ref HEAD"
+    gitCommand := "git symbolic-ref --short HEAD"
     rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
     output, err := rc.Run(gitCommand)
     return strings.TrimSpace(output), err;
