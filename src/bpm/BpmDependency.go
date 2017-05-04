@@ -1,20 +1,14 @@
 package main;
 
 import (
-    "strings"
-    "bpmerror"
 )
 
 type BpmDependency struct {
-    Commit string `json:"commit"`
     Url    string `json:"url"`
 }
 
 func (dep *BpmDependency) Validate() (error) {
-    if strings.TrimSpace(dep.Url) == "" {
-        return bpmerror.New(nil, "Error: No url specified")
-    }
-    return nil
+    return nil;
 }
 
 func (dep *BpmDependency) Equal(item *BpmDependency) bool {
@@ -22,7 +16,7 @@ func (dep *BpmDependency) Equal(item *BpmDependency) bool {
     if dep == item {
         return true;
     }
-    if item.Commit == dep.Commit && item.Url == dep.Url {
+    if item.Url == dep.Url {
         return true;
     }
     return false;

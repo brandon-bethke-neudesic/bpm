@@ -85,16 +85,20 @@ func AddRemotes(source string, itemPath string) error {
         // Rename the origin to local and then add the original origin as origin
         gitSource := GitExec{Path: path.Join(".", source)}
         gitDestination := GitExec{Path: itemPath};
+
+        // Always make sure the local remote is correct.
+        gitDestination.DeleteRemote("local");
+        localRemote := path.Join(Options.WorkingDir, source);
+        fmt.Println("Adding remote " + localRemote + " as local to " + itemPath)
+        err = gitDestination.AddRemote("local", localRemote)
+        if err != nil {
+            return bpmerror.New(err, "Error: There was an error adding the remote to the repository at " + itemPath)
+        }
+
         if !gitDestination.RemoteExists("local") {
             origin := gitSource.GetRemote("origin")
             if origin == nil {
                 return errors.New("Error: The remote 'origin' is missing")
-            }
-            localRemote := path.Join(Options.WorkingDir, source);
-            fmt.Println("Adding remote " + localRemote + " as local to " + itemPath)
-            err = gitDestination.AddRemote("local", localRemote)
-            if err != nil {
-                return bpmerror.New(err, "Error: There was an error adding the remote to the repository at " + itemPath)
             }
             gitDestination.DeleteRemote("origin");
             fmt.Println("Adding remote " + origin.Url + " as origin to " + itemPath)
@@ -117,11 +121,9 @@ func UseLocal(url string) bool {
     return false;
 }
 
-func CopyChanges(source string, destination string) error {
-
+func SwitchBranches(source string, destination string) error {
     // The the local option is used and the source repository url is a relative path, then copy any uncommitted changes.
     if UseLocal(source) {
-
         // Get all the changed files in the source repository, exluding deleted files, and copy them to the destination repository.
         gitSource := GitExec{Path: source}
         gitDestination := GitExec{Path: destination}
@@ -136,7 +138,17 @@ func CopyChanges(source string, destination string) error {
                 return bpmerror.New(err, "Error: Could not switch to branch " + branch + " in the destination repository")
             }
         }
+    }
+    return nil;
+}
 
+func CopyChanges(source string, destination string) error {
+
+    // The the local option is used and the source repository url is a relative path, then copy any uncommitted changes.
+    if UseLocal(source) {
+
+        // Get all the changed files in the source repository, exluding deleted files, and copy them to the destination repository.
+        gitSource := GitExec{Path: source}
         files, err := gitSource.LsFiles();
         if err != nil {
             return bpmerror.New(err, "Error: There was an error listing the changes in the repository at " + source)
@@ -147,14 +159,22 @@ func CopyChanges(source string, destination string) error {
             fileSource := path.Join(source, file)
             fileDestination := path.Join(destination, file)
 
-            parent, _ := filepath.Split(fileDestination)
-            os.MkdirAll(parent, 0777)
-            err = copyDir.CopyFile(fileSource, fileDestination);
-            if err != nil {
-                return bpmerror.New(err, "Error: There was an error copying the changes from " + fileSource + " to " + fileDestination);
+            fileInfo, err := os.Stat(fileSource)
+            if fileInfo.IsDir() {
+                os.MkdirAll(fileDestination, 0777)
+                err = copyDir.Copy(fileSource, fileDestination);
+                if err != nil {
+                    return bpmerror.New(err, "Error: There was an error copying the changes from " + fileSource + " to " + fileDestination);
+                }
+            } else {
+                parent, _ := filepath.Split(fileDestination)
+                os.MkdirAll(parent, 0777)
+                err = copyDir.CopyFile(fileSource, fileDestination);
+                if err != nil {
+                    return bpmerror.New(err, "Error: There was an error copying the changes from " + fileSource + " to " + fileDestination);
+                }
             }
         }
-
         // Retreive all the deleted files in the source repository and delete them from the destination repository
         files, err = gitSource.DeletedFiles();
         if err != nil {
@@ -174,29 +194,19 @@ func EnsurePath(path string){
     }
 }
 
-func ProcessModule(source string, commit string) (*BpmData, *ModuleCacheItem, error) {
+func ProcessModule(source string) (*BpmData, *ModuleCacheItem, error) {
     source = strings.Split(source, ".git")[0]
     _, itemName := filepath.Split(source)
     itemPath := path.Join(Options.BpmCachePath, itemName);
-    itemCommit := commit;
-    if itemCommit == "local" || itemCommit == "" {
-        itemCommit = "latest"
-    }
-
-
     isLocal := false;
     if PathExists(itemPath) {
         if Options.Command == "update" {
 
             git := GitExec{Path: itemPath}
-            //if UseLocal(source) {
-                // Remove any uncommited changes
-                err := git.Checkout(".");
-                if err != nil {
-                    return nil, nil, bpmerror.New(err, "Error: There was an issue trying to remove all uncommited changes in " + itemPath);
-                }
-            //}
-
+            err := git.Checkout(".");
+            if err != nil {
+                return nil, nil, bpmerror.New(err, "Error: There was an issue trying to remove all uncommited changes in " + itemPath);
+            }
             err = AddRemotes(source, itemPath);
             if err != nil {
                 return nil, nil, err;
@@ -224,57 +234,45 @@ func ProcessModule(source string, commit string) (*BpmData, *ModuleCacheItem, er
             }
             git.LogOutput = false;
 
-            err = CopyChanges(source, itemPath);
+            err = SwitchBranches(source, itemPath);
             if err != nil {
                 return nil, nil, err;
             }
-
-            if !git.HasChanges() {
-                itemCommit, err = git.GetLatestCommit();
-                if err != nil {
-                    return nil, nil, bpmerror.New(err, "Error: Could not find the latest commit in repository " + itemPath);
-                }
-            } else {
-                itemCommit = "latest"
+            err = CopyChanges(source, itemPath);
+            if err != nil {
+                return nil, nil, err;
             }
         } else {
             fmt.Println("Using cached item", itemName)
         }
     } else {
-        EnsurePath(itemPath);
-        git := GitExec{Path: itemPath, LogOutput: true}
 
         cloneUrl := source;
         if !strings.HasSuffix(cloneUrl, ".git") && (Options.UseLocalPath == "" || strings.HasPrefix(cloneUrl, "http")) {
             cloneUrl = cloneUrl + ".git";
         }
 
+        git := GitExec{LogOutput:true};
+        err := git.AddSubmodule("--force " + cloneUrl, itemPath)
+        if err != nil {
+            return nil, nil, bpmerror.New(err, "Error: Could not add the submodule " + itemPath);
+        }
+        git = GitExec{Path: itemPath, LogOutput: true}
+
         if UseLocal(cloneUrl) {
             cloneUrl = path.Join(Options.WorkingDir, source)
         }
 
-        err := git.InitAndFetch(cloneUrl);
+        err = git.Fetch("origin");
         if err != nil {
             return nil, nil, err;
         }
 
-        if itemCommit != "latest" {
-            err = git.Checkout(itemCommit);
-            if err != nil {
-                return nil, nil, err;
-            }
-        } else {
-            err = git.Checkout("master")
-            if err != nil {
-                return nil, nil, err;
-            }
-            git.LogOutput = false;
-            itemCommit, err = git.GetLatestCommit();
-            if err != nil {
-                return nil, nil, err;
-            }
-            git.LogOutput = false;
+        err = git.Checkout("master")
+        if err != nil {
+            return nil, nil, err;
         }
+        git.LogOutput = false;
         err = AddRemotes(source, itemPath);
         if err != nil {
             return nil, nil, err;
@@ -286,7 +284,22 @@ func ProcessModule(source string, commit string) (*BpmData, *ModuleCacheItem, er
             if err != nil {
                 return nil, nil, err;
             }
+            err = git.Pull("local", "master")
+            if err != nil {
+                return nil, nil, err;
+            }
         }
+
+        git.LogOutput = true;
+        err = SwitchBranches(source, itemPath);
+        if err != nil {
+            return nil, nil, err
+        }
+        _, err = git.Run("git submodule update --init --recursive")
+        if err != nil {
+            return nil, nil, err
+        }
+        git.LogOutput = false;
 
         err = CopyChanges(source, itemPath);
         if err != nil {
@@ -303,7 +316,7 @@ func ProcessModule(source string, commit string) (*BpmData, *ModuleCacheItem, er
         fmt.Println("Error: Could not read the version");
         return nil, nil, err;
     }
-    cacheItem := &ModuleCacheItem{Name:itemName, Version: moduleBpmVersion.String(), Commit: itemCommit, Path: itemPath, IsLocal: isLocal}
+    cacheItem := &ModuleCacheItem{Name:itemName, Version: moduleBpmVersion.String(), Path: itemPath, IsLocal: isLocal}
     return moduleBpm, cacheItem, nil;
 }
 
@@ -312,22 +325,11 @@ func MakeRemoteUrl(itemUrl string) (string, error) {
         _, name := filepath.Split(itemUrl)
         return path.Join(Options.UseLocalPath, strings.Split(name, ".git")[0]), nil;
     }
-
     adjustedUrl := itemUrl;
-    if adjustedUrl == "" {
-        // If a remote url is specified then use that one, otherwise determine the url of the specified remote name.
-        if Options.UseRemoteUrl != "" {
-            adjustedUrl = Options.UseRemoteUrl;
-        } else {
-            git := GitExec{}
-            remote := git.GetRemote(Options.UseRemoteName)
-            if remote == nil {
-                return "", errors.New("Error: There was a problem getting the remote url " + Options.UseRemoteName)
-            }
-            adjustedUrl = remote.Url;
-        }
-    } else if strings.Index(adjustedUrl, "http") != 0 {
+    if !strings.HasPrefix(adjustedUrl, "http") {
         var remoteUrl string;
+
+        relative := "";
         if Options.UseRemoteUrl != "" {
             remoteUrl = Options.UseRemoteUrl;
         } else {
@@ -337,29 +339,32 @@ func MakeRemoteUrl(itemUrl string) (string, error) {
                 return "", errors.New("Error: There was a problem getting the remote url " + Options.UseRemoteName)
             }
             remoteUrl = remote.Url;
+            relative = "..";
         }
         parsedUrl, err := url.Parse(remoteUrl)
         if err != nil {
             return "", bpmerror.New(err, "Error: There was a problem parsing the remote url " + remoteUrl)
         }
-        adjustedUrl = parsedUrl.Scheme + "://" + path.Join(parsedUrl.Host, parsedUrl.Path, itemUrl)
+
+        urlPath := strings.Split(parsedUrl.Path, ".git")[0]
+        adjustedUrl = parsedUrl.Scheme + "://" + path.Join(parsedUrl.Host, urlPath, relative, itemUrl)
+        if !strings.HasSuffix(adjustedUrl, ".git") {
+            adjustedUrl = adjustedUrl + ".git";
+        }
+        fmt.Println("Adjusted Url", adjustedUrl)
     }
     return adjustedUrl, nil;
 }
 
-func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
+func ProcessDependencies(bpm *BpmData) (error) {
     // Always process the keys sorted by name so the installation is consistent
     sortedKeys := bpm.GetSortedKeys();
     for _, itemName := range sortedKeys {
 
-        //if Options.Command == "install" {
-            // Do not process the item if it has already been processed and is local
-            existingCacheItem, exists := moduleCache.Items[itemName];
-            if exists && existingCacheItem.IsLocal {
-                continue;
-            }
-        //}
-
+        _, exists := moduleCache.Items[itemName];
+        if exists {
+            continue;
+        }
         item := bpm.Dependencies[itemName]
         err := item.Validate();
         if err != nil {
@@ -367,23 +372,22 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
         }
         if UseLocal(item.Url) {
             moduleSourceUrl := path.Join(Options.UseLocalPath, itemName);
-            moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl, item.Commit)
+            moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl)
             if err != nil {
                 return err;
             }
             moduleCache.Add(cacheItem)
             fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
-            err = ProcessDependencies(moduleBpm, "")
+            err = ProcessDependencies(moduleBpm)
             if err != nil {
                 return err;
             }
         } else {
-
             var moduleBpm *BpmData = nil;
             var cacheItem *ModuleCacheItem = nil;
 
             itemPath := path.Join(Options.BpmCachePath, itemName)
-            itemRemoteUrl := item.Url;
+
             if PathExists(itemPath) {
                 fmt.Println("Using cached item", itemName)
                 moduleBpm, err = LoadBpmData(itemPath)
@@ -395,33 +399,22 @@ func ProcessDependencies(bpm *BpmData, parentUrl string) (error) {
                 if git.RemoteExists("local") {
                     isLocal = true;
                 }
-                cacheItem = &ModuleCacheItem{Name:itemName, Version: moduleBpm.Version, Commit: item.Commit, Path: itemPath, IsLocal: isLocal}
+                cacheItem = &ModuleCacheItem{Name:itemName, Version: moduleBpm.Version, Path: itemPath, IsLocal: isLocal}
             } else {
                 var err error;
-                parentUrl, err = MakeRemoteUrl(parentUrl);
-                if err != nil {
-                    return err;
+                itemRemoteUrl := item.Url;
+                if itemRemoteUrl == "" {
+                    itemRemoteUrl = itemName;
                 }
-                tempUrl, err := url.Parse(parentUrl)
-                if err != nil {
-                    return bpmerror.New(err, "Error: There is something wrong with the module url " + parentUrl)
-                }
-                // If the item URL is a relative URL, then make a full URL using the parent url as the root.
-                if strings.Index(item.Url, "http") != 0 {
-                    itemRemoteUrl = tempUrl.Scheme + "://" + path.Join(tempUrl.Host, tempUrl.Path, item.Url)
-                }
-                moduleBpm, cacheItem, err = ProcessModule(itemRemoteUrl, item.Commit)
+                itemRemoteUrl, err = MakeRemoteUrl(itemRemoteUrl);
+                moduleBpm, cacheItem, err = ProcessModule(itemRemoteUrl)
                 if err != nil {
                     return err;
                 }
             }
             moduleCache.AddLatest(cacheItem)
             fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
-            if Options.UseParentUrl {
-                err = ProcessDependencies(moduleBpm, itemRemoteUrl)
-            } else {
-                err = ProcessDependencies(moduleBpm, "")
-            }
+            err = ProcessDependencies(moduleBpm)
             if err != nil {
                 return err;
             }

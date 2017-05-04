@@ -125,14 +125,18 @@ type GitRemote struct {
     Url string
 }
 
-func (git *GitExec) RenameRemote(oldName string, newName string) error {
-    gitCommand := "git remote rename " + oldName + " " + newName;
+func (git *GitExec) Run(command string) (string, error) {;
     rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
-    _, err := rc.Run(gitCommand)
+    output, err := rc.Run(command)
     if err != nil {
-        return err;
+        return "", err;
     }
-    return nil;
+    return output, nil;
+}
+
+func (git *GitExec) RenameRemote(oldName string, newName string) error {
+    _, err := git.Run("git remote rename " + oldName + " " + newName)
+    return err;
 }
 
 func (git *GitExec) GetRemotes() ([]*GitRemote, error) {
@@ -185,6 +189,13 @@ func (git *GitExec) GetLatestCommit() (string, error) {
         return "", err;
     }
     return strings.TrimSpace(stdOut), nil;
+}
+
+func (git *GitExec) AddSubmodule(url, location string) (error) {
+    gitCommand := "git submodule add " + url + " " + location;
+    rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
+    _, err := rc.Run(gitCommand);
+    return err;
 }
 
 func (git *GitExec) Init() error {

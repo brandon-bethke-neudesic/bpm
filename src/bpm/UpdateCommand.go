@@ -48,23 +48,23 @@ func (cmd *UpdateCommand) Execute() (error) {
         if cmd.Name != "" && cmd.Name != updateModule {
             continue;
         }
-        moduleSourceUrl, err := MakeRemoteUrl(depItem.Url)
-        parentUrl := "";
-        moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl, depItem.Commit)
+        moduleSourceUrl := depItem.Url;
+        if moduleSourceUrl == "" {
+            moduleSourceUrl = updateModule;
+        }
+        moduleSourceUrl, err := MakeRemoteUrl(moduleSourceUrl);
+
+        moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl);
         if err != nil {
             return err;
         }
         moduleCache.Add(cacheItem)
-        if Options.UseParentUrl {
-            parentUrl = moduleSourceUrl;
-        }
-
         fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
-        err = ProcessDependencies(moduleBpm, parentUrl)
+        err = ProcessDependencies(moduleBpm)
         if err != nil {
             return err;
         }
-        newItem := &BpmDependency{Url: depItem.Url, Commit: cacheItem.Commit}
+        newItem := &BpmDependency{Url: depItem.Url}
         bpm.Dependencies[updateModule] = newItem;
 
     }
@@ -110,6 +110,7 @@ func NewUpdateCommand() *cobra.Command {
     }
 
     flags := cmd.Flags();
+    flags.StringVar(&Options.UseLocalPath, "root", "", "")
     flags.StringVar(&Options.ConflictResolutionType, "resolution", "revisionlist", "")
     return cmd
 }

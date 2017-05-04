@@ -122,21 +122,26 @@ func (bpm *BpmData) LoadFile(file string) error {
     return nil;
 }
 
-func (bpm *BpmData) Clone(includeModules string) *BpmData {
+func (bpm *BpmData) Clone(only string) *BpmData {
     newBpm := &BpmData{};
     newBpm.Name = bpm.Name;
     newBpm.Version = bpm.Version;
     newBpm.Dependencies = make(map[string]*BpmDependency);
-    for name, v := range bpm.Dependencies {
-        newBpm.Dependencies[name] = v
-    }
 
-    if includeModules == "all" {
+    if only == "all" || only == "" {
+        for name, v := range bpm.Dependencies {
+            newBpm.Dependencies[name] = v
+        }
         return newBpm;
     }
-    whitelist := strings.Split(includeModules, ",")
-    for _, name := range whitelist {
-        delete(newBpm.Dependencies, name)
+    whitelist := strings.Split(only, ",")
+
+    for depName, v := range bpm.Dependencies {
+        for _, whiteName := range whitelist {
+            if depName == whiteName {
+                newBpm.Dependencies[depName] = v
+            }
+        }
     }
     return newBpm;
 }
