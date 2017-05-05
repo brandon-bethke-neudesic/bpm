@@ -14,14 +14,30 @@ type UninstallCommand struct {
     Name string
 }
 
-func (cmd *UninstallCommand) Execute() (error) {
-    if !Options.BpmFileExists() {
-        return errors.New("Error: The " + Options.BpmFileName + " file does not exist.");
-    }
-    bpm := BpmData{}
-    err := bpm.LoadFile(Options.BpmFileName);
+func (cmd *UninstallCommand) Remove(name string) (error) {
+    workingPath,_ := os.Getwd();
+    npm := NpmExec{Path: workingPath}
+    fmt.Println("Uninstalling npm module " + name);
+    err := npm.Uninstall(name)
     if err != nil {
-        return bpmerror.New(err, "Error: There was a problem loading the " + Options.BpmFileName + " file")
+        return bpmerror.New(err, "Error: Failed to npm uninstall module " + name)
+    }
+    itemPath := path.Join(Options.BpmCachePath, name);
+    git := &GitExec{LogOutput:true}
+    err = git.DeleteSubmodule(itemPath);
+    if err != nil {
+        return bpmerror.New(err, "Error: Could not delete the submodule at " + itemPath)
+    }
+    return nil;
+}
+
+func (cmd *UninstallCommand) Execute() (error) {
+    Options.EnsureBpmCacheFolder();
+
+    bpm := BpmModules{}
+    err := bpm.Load(Options.BpmCachePath);
+    if err != nil {
+        return err;
     }
 
     if !bpm.HasDependencies() {
@@ -29,24 +45,30 @@ func (cmd *UninstallCommand) Execute() (error) {
         return nil;
     }
 
-    _, exists := bpm.Dependencies[cmd.Name];
-    if !exists {
-        fmt.Println("Error: " + cmd.Name + " is not a dependency")
-        return nil;
-    }
+    if cmd.Name == "" {
+        for _, item := range bpm.Dependencies {
+            err = cmd.Remove(item.Name);
+            if err != nil {
+                return err;
+            }
+        }
 
-    delete(bpm.Dependencies, cmd.Name)
-    workingPath,_ := os.Getwd();
-    npm := NpmExec{Path: workingPath}
-    fmt.Println("Uninstalling npm module " + cmd.Name);
-    err = npm.Uninstall(cmd.Name)
-    if err != nil {
-        return bpmerror.New(err, "Error: Failed to npm uninstall module " + cmd.Name)
+    } else {
+        _, exists := bpm.Dependencies[cmd.Name];
+        if !exists {
+            fmt.Println("WARNING: " + cmd.Name + " is not a dependency");
+
+            ls := &LsCommand{};
+            ls.Execute();
+
+            return nil;
+        }
+
+        err = cmd.Remove(cmd.Name);
+        if err != nil {
+            return err;
+        }
     }
-    itemPath := path.Join(Options.BpmCachePath, cmd.Name);
-    os.RemoveAll(itemPath)
-    bpm.IncrementVersion();
-    bpm.WriteFile(path.Join(workingPath, Options.BpmFileName));
     return nil;
 }
 
@@ -61,7 +83,7 @@ func (cmd *UninstallCommand) Initialize() (error) {
 func NewUninstallCommand() *cobra.Command {
     myCmd := &UninstallCommand{}
     cmd := &cobra.Command{
-        Use:   "uninstall NAME",
+        Use:   "uninstall [NAME]",
         Short: "uninstall the specified component using npm and remove the item from the bpm_modules",
         Long:  "uninstall the specified component using npm and remove the item from the bpm_modules",
         PreRunE: func(cmd *cobra.Command, args []string) error {

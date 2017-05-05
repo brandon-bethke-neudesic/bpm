@@ -4,6 +4,7 @@ import (
     "strings"
     "bufio"
     "path"
+    "os"
 )
 
 type GitExec struct {
@@ -195,6 +196,29 @@ func (git *GitExec) AddSubmodule(url, location string) (error) {
     gitCommand := "git submodule add " + url + " " + location;
     rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
     _, err := rc.Run(gitCommand);
+    return err;
+}
+
+func (git *GitExec) DeleteSubmodule(location string) (error) {
+    gitCommand := "git submodule deinit -f " + location;
+    rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
+    _, err := rc.Run(gitCommand);
+
+    if err == nil {
+        gitCommand = "git rm -f " + location
+        rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
+        _, err = rc.Run(gitCommand);
+    }
+
+    if err == nil {
+        gitCommand = "rm -rf .git/modules/" + location
+        rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
+        _, err = rc.Run(gitCommand);
+    }
+
+    if err == nil {
+        os.RemoveAll(location)
+    }
     return err;
 }
 

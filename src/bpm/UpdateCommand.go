@@ -22,66 +22,41 @@ func (cmd *UpdateCommand) Initialize() (error) {
 }
 
 func (cmd *UpdateCommand) Execute() (error) {
-    if !Options.BpmFileExists() {
-        return errors.New("Error: The " + Options.BpmFileName + " file does not exist.");
-    }
-    bpm := BpmData{};
-    err := bpm.LoadFile(Options.BpmFileName);
+    bpm := BpmModules{}
+    err := bpm.Load(Options.BpmCachePath);
     if err != nil {
-        return bpmerror.New(nil, "Error: There was a problem loading the bpm.json file")
+        return err;
     }
+
     if !bpm.HasDependencies() {
-        fmt.Println("There are no dependencies. Done.")
+        fmt.Println("There are no dependencies")
         return nil;
     }
 
-    if cmd.Name != "" && !bpm.HasDependency(cmd.Name) {
-        return bpmerror.New(err, "Error: Could not find module " + cmd.Name + " in the dependencies")
-    }
+    name := cmd.Name;
 
-    fmt.Println("Processing dependencies for", bpm.Name, "version", bpm.Version);
-    // Always process the keys sorted by name so the installation is consistent
-    sortedKeys := bpm.GetSortedKeys();
-    for _, updateModule := range sortedKeys {
-        depItem := bpm.Dependencies[updateModule]
-        // If a specific module name was specified then skip the others.
-        if cmd.Name != "" && cmd.Name != updateModule {
-            continue;
-        }
-        moduleSourceUrl := depItem.Url;
-        if moduleSourceUrl == "" {
-            moduleSourceUrl = updateModule;
-        }
-        moduleSourceUrl, err := MakeRemoteUrl(moduleSourceUrl);
-
-        moduleBpm, cacheItem, err := ProcessModule(moduleSourceUrl);
+    if name != "" && bpm.HasDependency(name){
+        err = bpm.Dependencies[name].Update();
         if err != nil {
             return err;
         }
-        moduleCache.Add(cacheItem)
-        fmt.Println("Processing dependencies for", cacheItem.Name, "version", moduleBpm.Version);
-        err = ProcessDependencies(moduleBpm)
-        if err != nil {
-            return err;
+    } else if name != "" {
+        return errors.New("Error: The item " + name + " has not been installed.")
+    } else {
+        for _, item := range bpm.Dependencies {
+            fmt.Println("Updating all dependencies for " + Options.RootComponent);
+            err = item.Update();
+            if err != nil {
+                return err;
+            }
         }
-        newItem := &BpmDependency{Url: depItem.Url}
-        bpm.Dependencies[updateModule] = newItem;
-
     }
+
     if !Options.SkipNpmInstall {
         err = moduleCache.Install()
         if err != nil {
             return bpmerror.New(err, "Error: There was an issue performing npm install on the dependencies")
         }
-    }
-
-    err = bpm.IncrementVersion();
-    if err != nil {
-        return err;
-    }
-    err = bpm.WriteFile(Options.BpmFileName)
-    if err != nil {
-        return err;
     }
 
     return nil;
@@ -110,7 +85,6 @@ func NewUpdateCommand() *cobra.Command {
     }
 
     flags := cmd.Flags();
-    flags.StringVar(&Options.UseLocalPath, "root", "", "")
-    flags.StringVar(&Options.ConflictResolutionType, "resolution", "revisionlist", "")
+    flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the master repo can be found. Ex: bpm install --root=..")
     return cmd
 }

@@ -1,7 +1,6 @@
 package main;
 
 import (
-    "github.com/blang/semver"
     "fmt"
     "os"
     "path"
@@ -108,55 +107,6 @@ func (r *ModuleCache) CopyAndNpmInstall(nodeModulesPath string) (error){
     }
     return nil;
 }
-
-
-func (r *ModuleCache) AddLatest(item *ModuleCacheItem) (bool, error) {
-    existingItem, exists := r.Items[item.Name];
-    if !exists {
-        return r.Add(item), nil;
-    }
-
-    if item.IsLocal {
-        return r.Add(item), nil;
-    }
-
-    if Options.ConflictResolutionType == "versioning" {
-        v1, err := semver.Make(existingItem.Version)
-        if err != nil {
-            fmt.Println("Warning: There was a problem reading the version")
-            return false, nil;
-        }
-        v2, err := semver.Make(item.Version)
-        if err != nil {
-            fmt.Println("Warning: There was a problem reading the version")
-            return false, nil;
-        }
-        versionCompareResult := v1.Compare(v2);
-        if versionCompareResult == -1 {
-            fmt.Println("Ignoring lower version of ", item.Name);
-            return false, nil;
-        } else if versionCompareResult == 1 {
-            fmt.Println("The version number is greater and this version of the module will be used.")
-        } else {
-            // The version number is the same...
-            return false, nil;
-        }
-    }
-    return r.Add(item), nil
-}
-
-/*
-    existingItem, exists := r.Items[item.Name];
-    if !exists {
-        return r.Add(item), nil;
-    }
-
-    // If the existing cache item is a 'local' item, then the local item always has priority and there is no need to resolve any conflicts
-    if strings.HasSuffix(existingItem.Path, "/" + Options.LocalModuleName) {
-        return false, nil;
-    }
-
-*/
 
 func (r *ModuleCache) Add(item *ModuleCacheItem) (bool) {
     r.Items[item.Name] = item;

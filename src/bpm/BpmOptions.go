@@ -9,6 +9,7 @@ import (
 
 
 type BpmOptions struct {
+    RootComponent string
     Recursive bool
     ConflictResolutionType string
     UseLocalPath string

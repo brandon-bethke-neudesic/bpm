@@ -5,7 +5,6 @@ import (
     "fmt"
     "strings"
     "bpmerror"
-    "errors"
     "github.com/spf13/cobra"
     "path/filepath"
     "net/url"
@@ -15,7 +14,7 @@ import (
 type InstallCommand struct {
     Args []string
     Component string
-    Commit string
+    Name string
 }
 
 func (cmd *InstallCommand) Initialize() (error) {
@@ -33,51 +32,47 @@ func (cmd *InstallCommand) Initialize() (error) {
 func (cmd *InstallCommand) Execute() (error) {
     Options.EnsureBpmCacheFolder();
 
-    if !Options.BpmFileExists() {
-        return errors.New("Error: The " + Options.BpmFileName + " file does not exist.");
-    }
-    bpm := BpmData{}
-    err := bpm.LoadFile(Options.BpmFileName);
-    if err != nil {
-        return bpmerror.New(err, "Error: There was a problem loading the bpm.json file")
-    }
-    err = bpm.Validate();
-    if err != nil {
-        return bpmerror.New(err, "Error: There is a problem with the bpm.json file")
-    }
-
-    save := false;
-    name := cmd.Component
-    if !bpm.HasDependency(name) && name != "" {
-        newItem := &BpmDependency{}
-        if strings.HasPrefix(cmd.Component, "http") {
-            parsedUrl, err := url.Parse(cmd.Component);
-            if err != nil {
-                return bpmerror.New(err, "Error: Could not parse the component url");
-            }
-            _, name = filepath.Split(parsedUrl.Path)
-            name = strings.Split(name, ".git")[0]
-            newItem.Url = cmd.Component;
-        }
-        fmt.Println("Adding new component " + name)
-        bpm.Dependencies[name] = newItem;
-        save = true;
-    }
-    newBpm := bpm.Clone(name);
-    fmt.Println("Processing dependencies for", bpm.Name, "version", bpm.Version);
-    err = ProcessDependencies(newBpm)
+    bpm := BpmModules{}
+    err := bpm.Load(Options.BpmCachePath);
     if err != nil {
         return err;
     }
-    if !Options.SkipNpmInstall {
-        err = moduleCache.Install()
+    name := cmd.Component;
+    if strings.HasPrefix(cmd.Component, "http") {
+        parsedUrl, err := url.Parse(cmd.Component);
         if err != nil {
-            return err;
+            return bpmerror.New(err, "Error: Could not parse the component url");
+        }
+        _, name := filepath.Split(parsedUrl.Path)
+        name = strings.Split(name, ".git")[0]
+    }
+
+    if cmd.Name != "" {
+        name = cmd.Name;
+    }
+
+    if name != "" && bpm.HasDependency(name){
+        bpm.Dependencies[name].Install();
+    } else if name != "" {
+        newItem := &BpmDependency{Name:name}
+        newItem.InstallNew(cmd.Component)
+    } else {
+        if !bpm.HasDependencies() {
+            fmt.Println("There are no dependencies")
+            return nil;
+        }
+
+        fmt.Println("Installing all dependencies for " + Options.RootComponent);
+        for _, item := range bpm.Dependencies {
+            err = item.Install();
+            if err != nil {
+                return err;
+            }
         }
     }
 
-    if save {
-        err = bpm.WriteFile(Options.BpmFileName)
+    if !Options.SkipNpmInstall {
+        err = moduleCache.Install()
         if err != nil {
             return err;
         }
@@ -108,9 +103,7 @@ func NewInstallCommand() *cobra.Command {
     }
 
     flags := cmd.Flags();
-    flags.StringVar(&Options.UseLocalPath, "root", "", "")
-    flags.StringVar(&myCmd.Commit, "commit", "latest", "The commit value")
-    flags.StringVar(&Options.ConflictResolutionType, "resolution", "revisionlist", "")
-
+    flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the master repo can be found. Ex: bpm install --root=..")
+    flags.StringVar(&myCmd.Name, "name", "", "When installing a new component, use the specified name for the component instead of the name from the .git url. Ex: bpm install https://www.github.com/sample/js-sample.git --sample")
     return cmd
 }

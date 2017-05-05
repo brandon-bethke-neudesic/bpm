@@ -34,8 +34,6 @@ func NewBpmCommand() (*cobra.Command) {
     }
     cmd.AddCommand(
         NewInstallCommand(),
-        NewInitCommand(),
-        NewCleanCommand(),
         NewLsCommand(),
         NewUpdateCommand(),
         NewUninstallCommand(),
@@ -48,7 +46,6 @@ func NewBpmCommand() (*cobra.Command) {
     pf.StringVar(&Options.UseRemoteUrl, "remoteurl", "", "")
     pf.StringVar(&Options.PackageManager, "pkgm", "npm", "")
     pf.BoolVar(&Options.SkipNpmInstall, "skipnpm", false, "")
-    pf.BoolVar(&Options.UseParentUrl, "useparenturl", false, "")
     Options.WorkingDir, _ = os.Getwd();
 
     if strings.Index(Options.UseLocalPath, ".") == 0 || strings.Index(Options.UseLocalPath, "..") == 0 {
