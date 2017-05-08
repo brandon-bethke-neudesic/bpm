@@ -5,4 +5,5 @@ type ModuleCacheItem struct {
     Version string
     Path string
     IsLocal bool
+    Commit string
 }

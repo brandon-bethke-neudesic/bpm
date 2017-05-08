@@ -14,6 +14,7 @@ import (
 type BpmDependency struct {
     Name string
     Url string
+    Path string
 }
 
 func (dep *BpmDependency) Equal(item *BpmDependency) bool {
@@ -104,6 +105,56 @@ func (dep *BpmDependency) InstallNew(componentUrl string) (error) {
     }
 
     return dep.Install();
+}
+
+func (dep *BpmDependency) Scan() (error) {
+    git := &GitExec{Path: dep.Path}
+    itemCommit, err := git.GetLatestCommit();
+    if err != nil {
+        return err;
+    }
+    cacheItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path, Commit: itemCommit}
+    existingItem, exists := moduleCache.Items[dep.Name];
+    if !exists {
+        fmt.Println("Adding item to cache", dep.Name)
+        moduleCache.Add(cacheItem);
+    } else {
+        if existingItem.Commit != itemCommit {
+            fmt.Println("Attempting to determine latest commit. " + existingItem.Commit + " or " + itemCommit)
+            git := GitExec{Path: dep.Path}
+            result := git.DetermineLatest(itemCommit, existingItem.Commit)
+
+            //fmt.Println("current", itemCommit)
+            //fmt.Println("existing", existingItem.Commit)
+            //fmt.Println("result", result)
+
+            if result != existingItem.Commit {
+                moduleCache.Add(cacheItem)
+            }
+            fmt.Println("The most recent commit for " + dep.Name + " is " + result);
+        } else {
+            moduleCache.Add(cacheItem);
+        }
+    }
+
+    bpm := BpmModules{}
+    fmt.Println("Loading ", path.Join(dep.Path, Options.BpmCachePath))
+    err = bpm.Load(path.Join(dep.Path, Options.BpmCachePath));
+    if err != nil {
+        return err;
+    }
+
+    fmt.Println("Scanning dependencies for " + dep.Name)
+    fmt.Println(len(bpm.Dependencies))
+    fmt.Println(bpm.Dependencies)
+    for _, subdep := range bpm.Dependencies {
+        err = subdep.Scan();
+        if err != nil {
+            return err;
+        }
+    }
+
+    return nil;
 }
 
 func (dep *BpmDependency) Update() (error) {
@@ -199,9 +250,9 @@ func (dep *BpmDependency) Update() (error) {
         return err;
     }
 
-    fmt.Println("Installing dependencies for " + dep.Name)
+    fmt.Println("Scanning dependencies for " + dep.Name)
     for _, subdep := range bpm.Dependencies {
-        err = subdep.Update();
+        err = subdep.Scan();
         if err != nil {
             return err;
         }
@@ -304,6 +355,7 @@ func (dep *BpmDependency) Install() (error) {
 
     source = strings.Split(source, ".git")[0]
     itemPath := path.Join(Options.BpmCachePath, dep.Name);
+    dep.Path = itemPath;
 
     fmt.Println("Installing item " + dep.Name)
 
@@ -382,14 +434,18 @@ func (dep *BpmDependency) Install() (error) {
     }
 
     bpm := BpmModules{}
+    fmt.Println("Loading bpm modules for " + path.Join(itemPath, Options.BpmCachePath))
     err = bpm.Load(path.Join(itemPath, Options.BpmCachePath));
     if err != nil {
         return err;
     }
 
-    fmt.Println("Installing dependencies for " + dep.Name)
     for _, subdep := range bpm.Dependencies {
-        err = subdep.Install()
+        fmt.Println("Scanning dependencies for " + subdep.Path)
+
+        fmt.Println(subdep.Name, subdep.Path);
+
+        err = subdep.Scan();
         if err != nil {
             return err;
         }

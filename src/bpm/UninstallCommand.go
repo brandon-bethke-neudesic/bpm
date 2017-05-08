@@ -5,7 +5,6 @@ import (
     "fmt"
     "path"
     "bpmerror"
-    "errors"
     "github.com/spf13/cobra"
 )
 
@@ -73,10 +72,9 @@ func (cmd *UninstallCommand) Execute() (error) {
 }
 
 func (cmd *UninstallCommand) Initialize() (error) {
-    if len(cmd.Args) == 0 {
-        return errors.New("Error: A name is required. Ex: bpm uninstall NAME");
+    if len(cmd.Args) > 0 {
+        cmd.Name = cmd.Args[1];
     }
-    cmd.Name = cmd.Args[0];
     return nil;
 }
 

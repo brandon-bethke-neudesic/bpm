@@ -5,6 +5,7 @@ import (
     "bufio"
     "path"
     "os"
+    "fmt"
 )
 
 type GitExec struct {
@@ -100,25 +101,25 @@ func (git *GitExec) HasChanges() bool {
 // If commitB is printed, then commitA is an ancestor of commit B
 //"git rev-list <commitA> | grep $(git rev-parse <commitB>)"
 
-func (git *GitExec) DetermineAncestor(commit1 string, commit2 string) string {
+func (git *GitExec) DetermineLatest(commit1 string, commit2 string) string {
     rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
     stdOut, err := rc.Run("git rev-list " + commit1)
     if err != nil {
-        return "";
+        return commit1;
     }
+    fmt.Println(git.Path)
     if !strings.Contains(stdOut, commit2) {
         stdOut, err = rc.Run("git rev-list " + commit2)
         if err != nil {
-            return "";
+            return commit2;
         }
         if !strings.Contains(stdOut, commit1) {
-            return ""
+            return commit1;
         } else {
             return commit2
         }
-    } else {
-        return commit1
     }
+    return commit1;
 }
 
 type GitRemote struct {

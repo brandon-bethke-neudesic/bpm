@@ -4,6 +4,7 @@ import (
     "sort"
     "io/ioutil"
     "bpmerror"
+    "path"
 )
 
 type BpmModules struct {
@@ -43,7 +44,7 @@ func (bpm *BpmModules) Load(location string) (error) {
     for _, f := range files {
         if f.IsDir() {
             name := f.Name();
-            item := &BpmDependency{Name:name}
+            item := &BpmDependency{Name:name, Path: path.Join(location, name)}
             bpm.Dependencies[name] = item;
         }
     }
