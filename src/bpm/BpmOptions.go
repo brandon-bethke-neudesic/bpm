@@ -9,6 +9,7 @@ import (
 
 
 type BpmOptions struct {
+    Deep bool
     RootComponent string
     Recursive bool
     ConflictResolutionType string

@@ -5,14 +5,12 @@ import (
     "bufio"
     "path"
     "os"
-    "fmt"
 )
 
 type GitExec struct {
     Path string
     LogOutput bool
 }
-
 
 func (git *GitExec) IsGitRepo() bool {
     return PathExists(".git")
@@ -98,6 +96,14 @@ func (git *GitExec) HasChanges() bool {
     return len(files) > 0
 }
 
+
+func (git *GitExec) Status() error {
+    git.LogOutput = true;
+    _, err := git.Run("git status")
+    git.LogOutput = false;
+    return err;
+}
+
 // If commitB is printed, then commitA is an ancestor of commit B
 //"git rev-list <commitA> | grep $(git rev-parse <commitB>)"
 
@@ -107,7 +113,6 @@ func (git *GitExec) DetermineLatest(commit1 string, commit2 string) string {
     if err != nil {
         return commit1;
     }
-    fmt.Println(git.Path)
     if !strings.Contains(stdOut, commit2) {
         stdOut, err = rc.Run("git rev-list " + commit2)
         if err != nil {
@@ -183,14 +188,18 @@ func (git *GitExec) GetRemote(name string) (*GitRemote) {
     return gitRemote;
 }
 
-func (git *GitExec) GetLatestCommit() (string, error) {
-    gitCommand := "git log --max-count=1 --pretty=format:%H"
+func (git *GitExec) GetLatestCommitRemote(remote string) (string, error){
+    gitCommand := "git log --max-count=1 --pretty=format:%H " + remote
     rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
     stdOut, err :=rc.Run(gitCommand)
     if err != nil {
         return "", err;
     }
     return strings.TrimSpace(stdOut), nil;
+}
+
+func (git *GitExec) GetLatestCommit() (string, error) {
+    return git.GetLatestCommitRemote("");
 }
 
 func (git *GitExec) AddSubmodule(url, location string) (error) {
@@ -212,11 +221,13 @@ func (git *GitExec) DeleteSubmodule(location string) (error) {
     }
 
     if err == nil {
-        gitCommand = "rm -rf .git/modules/" + location
-        rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
-        _, err = rc.Run(gitCommand);
+        deleteFolder := path.Join(".git", "modules", location);
+        if PathExists(deleteFolder){
+            gitCommand = "rm -rf " + deleteFolder;
+            rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
+            _, err = rc.Run(gitCommand);
+        }
     }
-
     if err == nil {
         os.RemoveAll(location)
     }
@@ -231,7 +242,7 @@ func (git *GitExec) Init() error {
 }
 
 func (git *GitExec) GetCurrentBranch() (string, error) {
-    gitCommand := "git symbolic-ref --short HEAD"
+    gitCommand := "git rev-parse --abbrev-ref HEAD"
     rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
     output, err := rc.Run(gitCommand)
     return strings.TrimSpace(output), err;

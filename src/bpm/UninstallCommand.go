@@ -55,9 +55,9 @@ func (cmd *UninstallCommand) Execute() (error) {
     } else {
         _, exists := bpm.Dependencies[cmd.Name];
         if !exists {
-            fmt.Println("WARNING: " + cmd.Name + " is not a dependency");
+            fmt.Println("WARNING: " + cmd.Name + " is not a dependency. Listing dependency tree.");
 
-            ls := &LsCommand{};
+            ls := &LsCommand{TreeOnly: true};
             ls.Execute();
 
             return nil;
@@ -73,7 +73,7 @@ func (cmd *UninstallCommand) Execute() (error) {
 
 func (cmd *UninstallCommand) Initialize() (error) {
     if len(cmd.Args) > 0 {
-        cmd.Name = cmd.Args[1];
+        cmd.Name = cmd.Args[0];
     }
     return nil;
 }

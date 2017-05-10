@@ -38,14 +38,14 @@ func NewBpmCommand() (*cobra.Command) {
         NewUpdateCommand(),
         NewUninstallCommand(),
         NewVersionCommand(),
+        NewStatusCommand(),
+        NewCleanCommand(),
     )
 
     pf := cmd.PersistentFlags();
 
-    pf.StringVar(&Options.UseRemoteName, "remote", "origin", "")
     pf.StringVar(&Options.UseRemoteUrl, "remoteurl", "", "")
     pf.StringVar(&Options.PackageManager, "pkgm", "npm", "")
-    pf.BoolVar(&Options.SkipNpmInstall, "skipnpm", false, "")
     Options.WorkingDir, _ = os.Getwd();
 
     if strings.Index(Options.UseLocalPath, ".") == 0 || strings.Index(Options.UseLocalPath, "..") == 0 {

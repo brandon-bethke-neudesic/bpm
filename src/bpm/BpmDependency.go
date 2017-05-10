@@ -88,25 +88,6 @@ func (dep *BpmDependency) SwitchBranches(source string, destination string) erro
     return nil;
 }
 
-func (dep *BpmDependency) InstallNew(componentUrl string) (error) {
-    parsedUrl, err := url.Parse(componentUrl);
-    if err != nil {
-        return bpmerror.New(err, "Error: Could not parse the component url");
-    }
-
-    if dep.Name == "" {
-        _, name := filepath.Split(parsedUrl.Path)
-        name = strings.Split(name, ".git")[0]
-        dep.Name = name;
-    }
-
-    if dep.Url == "" {
-        dep.Url = componentUrl;
-    }
-
-    return dep.Install();
-}
-
 func (dep *BpmDependency) Scan() (error) {
     git := &GitExec{Path: dep.Path}
     itemCommit, err := git.GetLatestCommit();
@@ -116,18 +97,12 @@ func (dep *BpmDependency) Scan() (error) {
     cacheItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path, Commit: itemCommit}
     existingItem, exists := moduleCache.Items[dep.Name];
     if !exists {
-        fmt.Println("Adding item to cache", dep.Name)
         moduleCache.Add(cacheItem);
     } else {
         if existingItem.Commit != itemCommit {
             fmt.Println("Attempting to determine latest commit. " + existingItem.Commit + " or " + itemCommit)
             git := GitExec{Path: dep.Path}
             result := git.DetermineLatest(itemCommit, existingItem.Commit)
-
-            //fmt.Println("current", itemCommit)
-            //fmt.Println("existing", existingItem.Commit)
-            //fmt.Println("result", result)
-
             if result != existingItem.Commit {
                 moduleCache.Add(cacheItem)
             }
@@ -138,15 +113,13 @@ func (dep *BpmDependency) Scan() (error) {
     }
 
     bpm := BpmModules{}
-    fmt.Println("Loading ", path.Join(dep.Path, Options.BpmCachePath))
+    fmt.Println("Loading modules for", dep.Path)
     err = bpm.Load(path.Join(dep.Path, Options.BpmCachePath));
     if err != nil {
         return err;
     }
 
     fmt.Println("Scanning dependencies for " + dep.Name)
-    fmt.Println(len(bpm.Dependencies))
-    fmt.Println(bpm.Dependencies)
     for _, subdep := range bpm.Dependencies {
         err = subdep.Scan();
         if err != nil {
@@ -174,32 +147,38 @@ func (dep *BpmDependency) Update() (error) {
     }
     source = strings.Split(source, ".git")[0]
     _, itemName := filepath.Split(source)
-    itemPath := path.Join(Options.BpmCachePath, itemName);
+    //itemPath := path.Join(Options.BpmCachePath, itemName);
 
     fmt.Println("Processing item " + dep.Name)
 
-    if !PathExists(itemPath) {
+    if !PathExists(dep.Path) {
         err = dep.Install();
         if err != nil {
             return err;
         }
     }
+
+    // If the item is cached then it is already updated and there is no reason to update it again.
+    // Unless this is a deep update
     _, exists := moduleCache.Items[itemName];
-    if exists {
-        fmt.Println(dep.Name + " has already been processed.")
+    if exists && !Options.Deep {
         return nil;
     }
 
-    cacheItem := &ModuleCacheItem{Name:dep.Name, Path: itemPath}
+    git := &GitExec{Path: dep.Path}
+    itemCommit, err := git.GetLatestCommit();
+    if err != nil {
+        return err;
+    }
+    cacheItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path, Commit: itemCommit}
     moduleCache.Add(cacheItem)
 
-    git := GitExec{Path: itemPath}
     err = git.Checkout(".");
     if err != nil {
-        return bpmerror.New(err, "Error: There was an issue trying to remove all uncommited changes in " + itemPath);
+        return bpmerror.New(err, "Error: There was an issue trying to remove all uncommited changes in " + dep.Path);
     }
 
-    err = dep.AddRemotes(source, itemPath);
+    err = dep.AddRemotes(source, dep.Path);
     if err != nil {
         return err;
     }
@@ -210,7 +189,7 @@ func (dep *BpmDependency) Update() (error) {
         pullRemote = "local"
         branch, err := git.GetCurrentBranch();
         if err != nil {
-            return bpmerror.New(err, "Error: Could not find the current branch in repository " + itemPath);
+            return bpmerror.New(err, "Error: Could not find the current branch in repository " + dep.Path);
         }
         if branch == "HEAD" {
             branch = "master"
@@ -226,7 +205,7 @@ func (dep *BpmDependency) Update() (error) {
     git.LogOutput = false;
 
     if UseLocal(source){
-        err = dep.SwitchBranches(source, itemPath);
+        err = dep.SwitchBranches(source, dep.Path);
         if err != nil {
             return err;
         }
@@ -238,21 +217,25 @@ func (dep *BpmDependency) Update() (error) {
     }
 
     if UseLocal(source) {
-        err = dep.CopyChanges(source, itemPath);
+        err = dep.CopyChanges(source, dep.Path);
         if err != nil {
             return err;
         }
     }
 
     bpm := BpmModules{}
-    err = bpm.Load(path.Join(itemPath, Options.BpmCachePath));
+    err = bpm.Load(path.Join(dep.Path, Options.BpmCachePath));
     if err != nil {
         return err;
     }
 
     fmt.Println("Scanning dependencies for " + dep.Name)
     for _, subdep := range bpm.Dependencies {
-        err = subdep.Scan();
+        if Options.Deep {
+            err = subdep.Update();
+        } else {
+            err = subdep.Scan();
+        }
         if err != nil {
             return err;
         }
@@ -354,36 +337,33 @@ func (dep *BpmDependency) Install() (error) {
     }
 
     source = strings.Split(source, ".git")[0]
-    itemPath := path.Join(Options.BpmCachePath, dep.Name);
-    dep.Path = itemPath;
-
-    fmt.Println("Installing item " + dep.Name)
-
+    //itemPath := path.Join(Options.BpmCachePath, dep.Name);
+    //dep.Path = itemPath;
+    // If the item is cached then it is already installed and there is no reason to install it again.
     _, exists := moduleCache.Items[dep.Name];
     if exists {
-        fmt.Println(dep.Name + " has already been installed.")
         return nil;
     }
 
-    cacheItem := &ModuleCacheItem{Name:dep.Name, Path: itemPath}
+    cacheItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path}
     moduleCache.Add(cacheItem)
 
-    if !PathExists(itemPath) {
-        cloneUrl := source;
-        if !strings.HasSuffix(cloneUrl, ".git") && (Options.UseLocalPath == "" || strings.HasPrefix(cloneUrl, "http")) {
+    if !PathExists(dep.Path) {
+        fmt.Println("Installing item " + dep.Name)
+        cloneUrl := dep.Url;
+        if cloneUrl == "" {
+            cloneUrl = source;
+        }
+        if !strings.HasSuffix(cloneUrl, ".git") {
             cloneUrl = cloneUrl + ".git";
         }
 
         git := GitExec{LogOutput:true};
-        err = git.AddSubmodule("--force " + cloneUrl, itemPath)
+        err = git.AddSubmodule("--force " + cloneUrl, dep.Path)
         if err != nil {
-            return bpmerror.New(err, "Error: Could not add the submodule " + itemPath);
+            return bpmerror.New(err, "Error: Could not add the submodule " + dep.Path);
         }
-        git = GitExec{Path: itemPath, LogOutput: true}
-
-        if UseLocal(cloneUrl) {
-            cloneUrl = path.Join(Options.WorkingDir, source)
-        }
+        git = GitExec{Path: dep.Path, LogOutput: true}
 
         err = git.Fetch("origin");
         if err != nil {
@@ -395,7 +375,7 @@ func (dep *BpmDependency) Install() (error) {
             return err;
         }
         git.LogOutput = false;
-        err = dep.AddRemotes(source, itemPath);
+        err = dep.AddRemotes(source, dep.Path);
         if err != nil {
             return err;
         }
@@ -410,41 +390,47 @@ func (dep *BpmDependency) Install() (error) {
                 return err;
             }
             git.LogOutput = true;
-            err = dep.SwitchBranches(source, itemPath);
+            err = dep.SwitchBranches(source, dep.Path);
             if err != nil {
                 return err
             }
             git.LogOutput = false;
         }
         git.LogOutput = true;
+        /*
         _, err = git.Run("git submodule update --init --recursive")
         if err != nil {
             return err
         }
         git.LogOutput = false;
+        */
 
         if UseLocal(source){
-            err = dep.CopyChanges(source, itemPath);
+            err = dep.CopyChanges(source, dep.Path);
             if err != nil {
                 return err;
             }
         }
     } else {
-        fmt.Println(dep.Name + " has already been installed.")
+        fmt.Println("Found dependency " + dep.Name + " in bpm modules")
     }
 
+    git := &GitExec{Path: dep.Path}
+    itemCommit, err := git.GetLatestCommit();
+    if err != nil {
+        return err;
+    }
+    cacheItem.Commit = itemCommit;
+
     bpm := BpmModules{}
-    fmt.Println("Loading bpm modules for " + path.Join(itemPath, Options.BpmCachePath))
-    err = bpm.Load(path.Join(itemPath, Options.BpmCachePath));
+    fmt.Println("Loading modules for " + dep.Path)
+    err = bpm.Load(path.Join(dep.Path, Options.BpmCachePath));
     if err != nil {
         return err;
     }
 
     for _, subdep := range bpm.Dependencies {
         fmt.Println("Scanning dependencies for " + subdep.Path)
-
-        fmt.Println(subdep.Name, subdep.Path);
-
         err = subdep.Scan();
         if err != nil {
             return err;

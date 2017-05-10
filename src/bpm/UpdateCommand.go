@@ -43,8 +43,8 @@ func (cmd *UpdateCommand) Execute() (error) {
     } else if name != "" {
         return errors.New("Error: The item " + name + " has not been installed.")
     } else {
+        fmt.Println("Updating all dependencies for " + Options.RootComponent);
         for _, item := range bpm.Dependencies {
-            fmt.Println("Updating all dependencies for " + Options.RootComponent);
             err = item.Update();
             if err != nil {
                 return err;
@@ -85,6 +85,10 @@ func NewUpdateCommand() *cobra.Command {
     }
 
     flags := cmd.Flags();
-    flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the master repo can be found. Ex: bpm install --root=..")
+    flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the dependent repos can be found. Ex: bpm install --root=..")
+    flags.BoolVar(&Options.Deep, "deep", false, "Update all dependencies in the bpm modules hierachy");
+    flags.BoolVar(&Options.SkipNpmInstall, "skipnpm", false, "Do not perform a npm install")
+    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "")
+
     return cmd
 }

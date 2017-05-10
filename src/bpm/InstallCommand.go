@@ -8,8 +8,8 @@ import (
     "github.com/spf13/cobra"
     "path/filepath"
     "net/url"
+    "path"
 )
-
 
 type InstallCommand struct {
     Args []string
@@ -43,8 +43,11 @@ func (cmd *InstallCommand) Execute() (error) {
         if err != nil {
             return bpmerror.New(err, "Error: Could not parse the component url");
         }
-        _, name := filepath.Split(parsedUrl.Path)
+        _, name = filepath.Split(parsedUrl.Path)
         name = strings.Split(name, ".git")[0]
+    } else if strings.HasPrefix(cmd.Component, "../")  || strings.HasPrefix(cmd.Component, "./") {
+        _, name = filepath.Split(cmd.Component);
+        name = strings.Split(name, ".git")[0];
     }
 
     if cmd.Name != "" {
@@ -54,8 +57,8 @@ func (cmd *InstallCommand) Execute() (error) {
     if name != "" && bpm.HasDependency(name){
         bpm.Dependencies[name].Install();
     } else if name != "" {
-        newItem := &BpmDependency{Name:name}
-        newItem.InstallNew(cmd.Component)
+        newItem := &BpmDependency{Name:name, Path: path.Join(Options.BpmCachePath, name), Url: cmd.Component}
+        newItem.Install();
     } else {
         if !bpm.HasDependencies() {
             fmt.Println("There are no dependencies")
@@ -103,7 +106,9 @@ func NewInstallCommand() *cobra.Command {
     }
 
     flags := cmd.Flags();
-    flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the master repo can be found. Ex: bpm install --root=..")
+    flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the dependent repos can be found. Ex: bpm install --root=..")
     flags.StringVar(&myCmd.Name, "name", "", "When installing a new component, use the specified name for the component instead of the name from the .git url. Ex: bpm install https://www.github.com/sample/js-sample.git --sample")
-    return cmd
+    flags.BoolVar(&Options.SkipNpmInstall, "skipnpm", false, "Do not perform a npm install")
+    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "")
+    return cmd;
 }
