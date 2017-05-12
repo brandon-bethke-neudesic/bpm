@@ -1,25 +1,32 @@
 #!/bin/bash
-export GOPATH=`pwd`
+if [[ "$GOPATH" == "" ]]; then
+    export GOPATH=`pwd`
+fi
+
 go get bpm
 if [[ $? -ne 0 ]]; then
-    exit 0
+    exit 1
 fi
 go install bpm
 if [[ $? -ne 0 ]]; then
-    exit 0
+    exit 1
 fi
 if [ -f /usr/local/bin/bpm ]; then
+    echo Removing existing symbolic link
     rm /usr/local/bin/bpm
 fi
 echo Creating symbolic link for bpm in /usr/local/bin
-ln -s `pwd`/bin/bpm /usr/local/bin/bpm
+ln -s $GOPATH/bin/bpm /usr/local/bin/bpm
 
 echo Creating linux version
-env GOPATH=`pwd` GOOS=linux GOARCH=amd64 go build ./src/bpm
-mkdir -p ./bin/linux
-mv ./bpm ./bin/linux/bpm
+mkdir -p $GOPATH/bin/linux
+env GOPATH=$GOPATH GOOS=linux GOARCH=amd64 go build -o $GOPATH/bin/linux/bpm bpm
 
-echo Creating darwin version
-env GOPATH=`pwd` GOOS=darwin GOARCH=amd64 go build ./src/bpm
-mkdir -p ./bin/darwin
-mv ./bpm ./bin/darwin/bpm
+if [[ "$TPM_CLUSTER_HOME" != "" ]]; then
+	echo Copying linux binary to tpm cluster includes location
+	cp $GOPATH/bin/linux/bpm $TPM_CLUSTER_HOME/includes/bpm/bin/linux
+fi
+
+#echo Creating darwin version
+#mkdir -p $GOPATH/bin/darwin
+#env GOPATH=$GOPATH GOOS=darwin GOARCH=amd64 go build -o $GOPATH/bin/darwin/bpm bpm

@@ -53,11 +53,15 @@ func EnsurePath(path string){
 }
 
 func UpdatePackageJsonVersion(location string) (error) {
-    pj := &PackageJson{Path: location}
-    pj.Load();
-    pj.UpdateVersion();
-    pj.Save();
-    return nil;
+    pj := PackageJson{Path: location}
+    err := pj.Load();
+    if err == nil {
+        err = pj.UpdateVersion();
+    }
+    if err == nil {
+        err = pj.Save();
+    }
+    return err;
 }
 
 func MakeRemoteUrl(itemUrl string) (string, error) {
