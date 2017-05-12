@@ -29,12 +29,12 @@ func SliceIndex(limit int, predicate func(i int) bool) int {
     return -1
 }
 
-func PathExists(path string) (bool) {
-    _, err := os.Stat(path)
-    if err == nil { return true }
-    if os.IsNotExist(err) { return false }
-    fmt.Println("Error:", err)
-    return true
+func PathExists(location string) (bool) {
+    stat, err := os.Stat(location)
+    if err == nil && stat.IsDir() {
+        return true
+    }
+    return false;
 }
 
 
@@ -52,6 +52,14 @@ func EnsurePath(path string){
     }
 }
 
+func UpdatePackageJsonVersion(location string) (error) {
+    pj := &PackageJson{Path: location}
+    pj.Load();
+    pj.UpdateVersion();
+    pj.Save();
+    return nil;
+}
+
 func MakeRemoteUrl(itemUrl string) (string, error) {
     if UseLocal(itemUrl) {
         _, name := filepath.Split(itemUrl)
@@ -65,7 +73,7 @@ func MakeRemoteUrl(itemUrl string) (string, error) {
         if Options.UseRemoteUrl != "" {
             remoteUrl = Options.UseRemoteUrl;
         } else {
-            git := GitExec{}
+            git := GitExec{LogOutput: true}
             remote := git.GetRemote(Options.UseRemoteName)
             if remote == nil {
                 return "", errors.New("Error: There was a problem getting the remote url " + Options.UseRemoteName)

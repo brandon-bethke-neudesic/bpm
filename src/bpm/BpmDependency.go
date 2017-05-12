@@ -9,6 +9,7 @@ import (
     "os"
     "net/url"
     "errors"
+    "github.com/blang/semver"
 )
 
 type BpmDependency struct {
@@ -37,6 +38,13 @@ func (dep *BpmDependency) CopyChanges(source string, destination string) error {
     }
     fmt.Println("Copying local changes from " + source + " to " + destination)
     copyDir := &CopyDir{};
+
+    updatePackageJson := false;
+
+    if len(files) > 0 {
+        updatePackageJson = true;
+    }
+
     for _, file := range files {
         fileSource := path.Join(source, file)
         fileDestination := path.Join(destination, file)
@@ -66,9 +74,18 @@ func (dep *BpmDependency) CopyChanges(source string, destination string) error {
         fileDestination := path.Join(destination, file);
         os.Remove(fileDestination);
     }
+
+    if len(files) > 0 || updatePackageJson {
+        UpdatePackageJsonVersion(source);
+        err = copyDir.CopyFile(path.Join(source, "package.json"), path.Join(destination, "package.json"));
+        if err != nil {
+            return err;
+        }
+    }
+
+
     return nil;
 }
-
 
 func (dep *BpmDependency) SwitchBranches(source string, destination string) error {
     // Get all the changed files in the source repository, exluding deleted files, and copy them to the destination repository.
@@ -92,7 +109,7 @@ func (dep *BpmDependency) Scan() (error) {
     git := &GitExec{Path: dep.Path}
     itemCommit, err := git.GetLatestCommit();
     if err != nil {
-        return err;
+        return bpmerror.New(err, "Error: Could not get the latest commit for " + git.Path);
     }
     cacheItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path, Commit: itemCommit}
     existingItem, exists := moduleCache.Items[dep.Name];
@@ -147,12 +164,10 @@ func (dep *BpmDependency) Update() (error) {
     }
     source = strings.Split(source, ".git")[0]
     _, itemName := filepath.Split(source)
-    //itemPath := path.Join(Options.BpmCachePath, itemName);
-
     fmt.Println("Processing item " + dep.Name)
 
     if !PathExists(dep.Path) {
-        err = dep.Install();
+        err = dep.Add();
         if err != nil {
             return err;
         }
@@ -164,15 +179,7 @@ func (dep *BpmDependency) Update() (error) {
     if exists && !Options.Deep {
         return nil;
     }
-
     git := &GitExec{Path: dep.Path}
-    itemCommit, err := git.GetLatestCommit();
-    if err != nil {
-        return err;
-    }
-    cacheItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path, Commit: itemCommit}
-    moduleCache.Add(cacheItem)
-
     err = git.Checkout(".");
     if err != nil {
         return bpmerror.New(err, "Error: There was an issue trying to remove all uncommited changes in " + dep.Path);
@@ -196,6 +203,19 @@ func (dep *BpmDependency) Update() (error) {
         }
     }
 
+    /*
+    if pullRemote == "local" {
+        err := git.Fetch(pullRemote)
+        if err != nil {
+            return err;
+        }
+        output, err = git.Run("git diff " + pullRemote + "/" + branch + " --shortstat")
+        if strings.TrimSpace(output) != "" {
+            UpdatePackageJsonVersion(source)
+        }
+    }
+    */
+
     git.LogOutput = true
 
     err = git.Pull(pullRemote, branch);
@@ -211,10 +231,12 @@ func (dep *BpmDependency) Update() (error) {
         }
     }
 
+    git.LogOutput = true;
     _, err = git.Run("git submodule update --init --recursive")
     if err != nil {
         return err
     }
+    git.LogOutput = false;
 
     if UseLocal(source) {
         err = dep.CopyChanges(source, dep.Path);
@@ -222,6 +244,13 @@ func (dep *BpmDependency) Update() (error) {
             return err;
         }
     }
+
+    itemCommit, err := git.GetLatestCommit();
+    if err != nil {
+        return bpmerror.New(err, "Error: Could not get the latest commit for " + git.Path);
+    }
+    cacheItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path, Commit: itemCommit}
+    moduleCache.Add(cacheItem)
 
     bpm := BpmModules{}
     err = bpm.Load(path.Join(dep.Path, Options.BpmCachePath));
@@ -240,6 +269,8 @@ func (dep *BpmDependency) Update() (error) {
             return err;
         }
     }
+    UpdatePackageJsonVersion(".")
+
     return nil;
 }
 
@@ -319,8 +350,43 @@ func (dep *BpmDependency) AddRemotes(source string, itemPath string) error {
     return nil
 }
 
-
 func (dep *BpmDependency) Install() (error) {
+    pj := &PackageJson{Path: dep.Path};
+    pj.Load();
+
+    newItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path, Version: pj.Version.String()}
+    existingItem, exists := moduleCache.Items[dep.Name];
+    if exists {
+        existingVersion, _ := semver.Make(existingItem.Version)
+        newVersion, _ := semver.Make(newItem.Version)
+        if newVersion.GT(existingVersion) {
+            moduleCache.Add(newItem)
+        } else {
+            fmt.Println("Version is not bigger")
+        }
+    } else {
+        moduleCache.Add(newItem)
+    }
+
+    bpm := BpmModules{}
+    fmt.Println("Loading modules for " + dep.Path)
+    err := bpm.Load(path.Join(dep.Path, Options.BpmCachePath));
+    if err != nil {
+        return err;
+    }
+
+    for _, subdep := range bpm.Dependencies {
+        fmt.Println("Installing dependencies for " + subdep.Path)
+        err = subdep.Install();
+        if err != nil {
+            return err;
+        }
+    }
+
+    return nil;
+}
+
+func (dep *BpmDependency) Add() (error) {
     var err error;
     source := "";
     if UseLocal(dep.Url) {
@@ -337,8 +403,6 @@ func (dep *BpmDependency) Install() (error) {
     }
 
     source = strings.Split(source, ".git")[0]
-    //itemPath := path.Join(Options.BpmCachePath, dep.Name);
-    //dep.Path = itemPath;
     // If the item is cached then it is already installed and there is no reason to install it again.
     _, exists := moduleCache.Items[dep.Name];
     if exists {
@@ -348,77 +412,77 @@ func (dep *BpmDependency) Install() (error) {
     cacheItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path}
     moduleCache.Add(cacheItem)
 
-    if !PathExists(dep.Path) {
-        fmt.Println("Installing item " + dep.Name)
-        cloneUrl := dep.Url;
-        if cloneUrl == "" {
-            cloneUrl = source;
-        }
-        if !strings.HasSuffix(cloneUrl, ".git") {
-            cloneUrl = cloneUrl + ".git";
-        }
+    fmt.Println("Installing item " + dep.Name)
+    cloneUrl := dep.Url;
+    if cloneUrl == "" {
+        cloneUrl = source;
+    }
+    if !strings.HasSuffix(cloneUrl, ".git") {
+        cloneUrl = cloneUrl + ".git";
+    }
 
-        git := GitExec{LogOutput:true};
-        err = git.AddSubmodule("--force " + cloneUrl, dep.Path)
-        if err != nil {
-            return bpmerror.New(err, "Error: Could not add the submodule " + dep.Path);
-        }
-        git = GitExec{Path: dep.Path, LogOutput: true}
+    git := GitExec{LogOutput:true};
+    err = git.AddSubmodule("--force " + cloneUrl, dep.Path)
+    if err != nil {
+        return bpmerror.New(err, "Error: Could not add the submodule " + dep.Path);
+    }
+    git = GitExec{Path: dep.Path, LogOutput: true}
 
-        err = git.Fetch("origin");
+    err = git.Fetch("origin");
+    if err != nil {
+        return err;
+    }
+
+    err = git.Checkout("master")
+    if err != nil {
+        return err;
+    }
+    git.LogOutput = false;
+    err = dep.AddRemotes(source, dep.Path);
+    if err != nil {
+        return err;
+    }
+
+    if UseLocal(source) {
+        err := git.Fetch("local")
         if err != nil {
             return err;
         }
 
-        err = git.Checkout("master")
-        if err != nil {
-            return err;
-        }
-        git.LogOutput = false;
-        err = dep.AddRemotes(source, dep.Path);
-        if err != nil {
-            return err;
-        }
-
-        if UseLocal(source) {
-            err := git.Fetch("local")
-            if err != nil {
-                return err;
-            }
-            err = git.Pull("local", "master")
-            if err != nil {
-                return err;
-            }
-            git.LogOutput = true;
-            err = dep.SwitchBranches(source, dep.Path);
-            if err != nil {
-                return err
-            }
-            git.LogOutput = false;
-        }
-        git.LogOutput = true;
         /*
-        _, err = git.Run("git submodule update --init --recursive")
+        output, err = git.Run("git diff local/master --shortstat")
+        if strings.TrimSpace(output) != "" {
+            UpdatePackageJsonVersion(source)
+        }
+        */
+
+        err = git.Pull("local", "master")
+        if err != nil {
+            return err;
+        }
+        err = dep.SwitchBranches(source, dep.Path);
         if err != nil {
             return err
         }
-        git.LogOutput = false;
-        */
+    }
+    git.LogOutput = true;
+    _, err = git.Run("git submodule update --init --recursive")
+    if err != nil {
+        return err
+    }
+    git.LogOutput = false;
 
-        if UseLocal(source){
-            err = dep.CopyChanges(source, dep.Path);
-            if err != nil {
-                return err;
-            }
+    if UseLocal(source){
+        err = dep.CopyChanges(source, dep.Path);
+        if err != nil {
+            return err;
         }
-    } else {
-        fmt.Println("Found dependency " + dep.Name + " in bpm modules")
     }
 
-    git := &GitExec{Path: dep.Path}
+    git = GitExec{Path: dep.Path, LogOutput: true}
     itemCommit, err := git.GetLatestCommit();
     if err != nil {
-        return err;
+        return bpmerror.New(err, "Error: Could not get the latest commit for " + git.Path);
     }
     cacheItem.Commit = itemCommit;
 
@@ -428,6 +492,7 @@ func (dep *BpmDependency) Install() (error) {
     if err != nil {
         return err;
     }
+    UpdatePackageJsonVersion(".")
 
     for _, subdep := range bpm.Dependencies {
         fmt.Println("Scanning dependencies for " + subdep.Path)

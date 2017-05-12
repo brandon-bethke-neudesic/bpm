@@ -31,8 +31,6 @@ func (git *GitExec) getChangedFiles() ([]string, error) {
     }
 
     // Get untracked files
-
-
     gitCommand = "git ls-files -o"
     if PathExists(path.Join(git.Path, ".gitignore")){
         gitCommand = gitCommand + " --exclude-from=.gitignore"

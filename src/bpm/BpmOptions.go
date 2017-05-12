@@ -24,7 +24,6 @@ type BpmOptions struct {
     PackageManager string
     WorkingDir string
     UseParentUrl bool
-    Command string
 }
 
 func (options *BpmOptions) EnsureBpmCacheFolder() {

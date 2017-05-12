@@ -209,7 +209,6 @@ func NewLsCommand() *cobra.Command {
             return myCmd.Initialize();
         },
         Run: func(cmd *cobra.Command, args []string) {
-            Options.Command = "ls"
             err := myCmd.Execute();
             if err != nil {
                 fmt.Println(err);

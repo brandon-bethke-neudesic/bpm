@@ -6,6 +6,7 @@ import (
     "github.com/spf13/cobra"
     "strings"
     "errors"
+    "path"
 )
 
 type StatusCommand struct {
@@ -19,10 +20,7 @@ func (cmd *StatusCommand) Execute() (error) {
     folders := strings.Split(cmd.Name, "/");
 
     newFolder := strings.Join(folders, "/bpm_modules/")
-    newFolder = "bpm_modules/" + newFolder;
-
-    fmt.Println(newFolder)
-
+    newFolder = path.Join("bpm_modules", newFolder);
     git := &GitExec{Path:newFolder};
     err := git.Status();
     return err;
@@ -48,7 +46,6 @@ func NewStatusCommand() *cobra.Command {
             return myCmd.Initialize();
         },
         Run: func(cmd *cobra.Command, args []string) {
-            Options.Command = "status"
             err := myCmd.Execute();
             if err != nil {
                 fmt.Println(err);

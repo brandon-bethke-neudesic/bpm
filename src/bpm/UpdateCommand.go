@@ -73,8 +73,6 @@ func NewUpdateCommand() *cobra.Command {
             return myCmd.Initialize();
         },
         Run: func(cmd *cobra.Command, args []string) {
-            Options.Command = "update"
-
             err := myCmd.Execute();
             if err != nil {
                 fmt.Println(err);

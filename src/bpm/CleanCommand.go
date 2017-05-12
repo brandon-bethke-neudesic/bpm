@@ -64,7 +64,6 @@ func NewCleanCommand() *cobra.Command {
             return myCmd.Initialize();
         },
         Run: func(cmd *cobra.Command, args []string) {
-            Options.Command = "clean"
             err := myCmd.Execute();
             if err != nil {
                 fmt.Println(err);

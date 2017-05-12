@@ -19,7 +19,6 @@ The Better Package Manager
 }
 
 func NewBpmCommand() (*cobra.Command) {
-    Options.Command = "bpm"
     myCmd := &BpmCommand{}
     cmd := &cobra.Command{
         Use:          "bpm",
@@ -33,13 +32,14 @@ func NewBpmCommand() (*cobra.Command) {
 
     }
     cmd.AddCommand(
-        NewInstallCommand(),
+        NewAddCommand(),
         NewLsCommand(),
         NewUpdateCommand(),
-        NewUninstallCommand(),
+        NewRemoveCommand(),
         NewVersionCommand(),
         NewStatusCommand(),
         NewCleanCommand(),
+        NewInstallCommand(),
     )
 
     pf := cmd.PersistentFlags();
