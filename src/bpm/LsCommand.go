@@ -13,7 +13,6 @@ type LsCommand struct {
     Args []string
 }
 
-
 func (cmd *LsCommand) IndentAndPrintTree(indentLevel int, mytext string){
     text := "|"
     for i := 0; i < indentLevel; i++ {
@@ -35,6 +34,11 @@ type WarningItem struct {
     Name string
     Message string
 }
+
+func (warn *WarningItem) String() string {
+	return warn.Message;
+}
+
 var warnings []*WarningItem = make([]*WarningItem, 0);
 
 func (cmd *LsCommand) PrintDependenciesTree(bpm *BpmModules, indentLevel int) {
@@ -56,19 +60,42 @@ func (cmd *LsCommand) PrintDependenciesTree(bpm *BpmModules, indentLevel int) {
 }
 
 func (cmd *LsCommand) PrintDependencies(bpm *BpmModules, indentLevel int) {
+
+    goInto := func(item *BpmDependency, indentLevel int){
+        // Traverse the hierarchy for the current dependency
+        moduleBpm := &BpmModules{};
+        err := moduleBpm.Load(path.Join(item.Path, Options.BpmCachePath));
+        if err != nil {
+            cmd.IndentAndPrint(indentLevel, "Error: Could not load dependencies for " + item.Name);
+            return;
+        }
+        cmd.PrintDependencies(moduleBpm, indentLevel);        
+    }
+
     // Sort the dependency keys so the dependencies always print in the same order
     sorted := bpm.GetSortedKeys();
+    
     for _, itemName := range sorted {
         item := bpm.Dependencies[itemName]
         cmd.IndentAndPrintTree(indentLevel, "")
         git := &GitExec{Path: item.Path}
         itemCommit, err := git.GetLatestCommit();
         if err != nil {
-            itemCommit = "Unknown"
+	        cmd.IndentAndPrintTree(indentLevel, "--[" + item.Name + "] Error: Could not get commit information for " + item.Path);
+            warn := &WarningItem{Path: item.Path, Name: item.Name}
+            warn.Message = "Error: [" + item.Path + "] - Error: Could not get commit information for " + item.Path;
+            warnings = append(warnings, warn)
+	        goInto(item, indentLevel + 1);
+	        continue;	        
         }
         branch, err := git.GetCurrentBranch()
         if err != nil {
-            branch = "Unknown"
+	        cmd.IndentAndPrintTree(indentLevel, "--[" + item.Name + "] Error: Could not get branch information for " + item.Path);
+            warn := &WarningItem{Path: item.Path, Name: item.Name}
+            warn.Message = "Error: [" + item.Path + "] - Error: Could not get branch information for " + item.Path;
+            warnings = append(warnings, warn)
+	        goInto(item, indentLevel + 1);
+	        continue;
         }
         cmd.IndentAndPrintTree(indentLevel, "--[" + item.Name + "] @ " + branch + " " + itemCommit)
 
@@ -83,18 +110,34 @@ func (cmd *LsCommand) PrintDependencies(bpm *BpmModules, indentLevel int) {
         if localRemote != nil {
             err := git.Fetch("local");
             if err != nil {
-                fmt.Println("Error fetching")
+		        cmd.IndentAndPrintTree(indentLevel, "Error: Could not fetch information for remote local at " + localRemote.Url);
+	            warn := &WarningItem{Path: item.Path, Name: item.Name}
+	            warn.Message = "Error: [" + item.Path + "] - Error: Could not fetch information for remote local at " + localRemote.Url;
+	            warnings = append(warnings, warn)
+		        goInto(item, indentLevel + 1);
+		        continue;	                    	
             }
 
             localGit := &GitExec{Path: localRemote.Url}
             localItemCommit, err := localGit.GetLatestCommit();
             if err != nil {
-                localItemCommit = "Unknown"
+		        cmd.IndentAndPrintTree(indentLevel, "Error: Could not get remote commit information for " + localRemote.Url);
+	            warn := &WarningItem{Path: item.Path, Name: item.Name}
+	            warn.Message = "Error: [" + item.Path + "] - Error: Could not get remote commit information for " + localRemote.Url;
+	            warnings = append(warnings, warn)
+		        goInto(item, indentLevel + 1);
+		        continue;	                    	
             }
             localBranch, err := localGit.GetCurrentBranch()
             if err != nil {
-                localBranch = "Unknown"
+		        cmd.IndentAndPrintTree(indentLevel, "Error: Could not get remote branch information for " + localRemote.Url);
+	            warn := &WarningItem{Path: item.Path, Name: item.Name}
+	            warn.Message = "Error: [" + item.Path + "] - Error: Could not get remote branch information for " + localRemote.Url;
+	            warnings = append(warnings, warn)
+		        goInto(item, indentLevel + 1);
+		        continue;	        
             }
+
             if localItemCommit != itemCommit {
                 cmd.IndentAndPrintTree(indentLevel, "  WARNING: Commit is different. local/" + localBranch + " " + localItemCommit)
                 warn := &WarningItem{Path: item.Path, Name: item.Name}
@@ -102,62 +145,64 @@ func (cmd *LsCommand) PrintDependencies(bpm *BpmModules, indentLevel int) {
                 warnings = append(warnings, warn)
                 output, err := git.Run("git show -s --pretty=\"%an -  %ad - %B\" " + itemCommit)
                 if err != nil {
-                    output = "Could not get commit information"
+                    output = "Error: Could not get commit information"
                 }
                 output = strings.TrimSpace(output);
                 warn.Message = warn.Message + "\n         MODULE[" + itemCommit + "] - " + output
-
-                output, err = git.Run("git show -s --pretty=\"%an -  %ad - %B\" local/" + branch)
+                output, err = localGit.Run("git show -s --pretty=\"%an -  %ad - %B\" " + localItemCommit)
                 if err != nil {
-                    output = "Could not get commit information"
+                    output = "Error: Could not get commit information"
                 }
                 output = strings.TrimSpace(output);
-                warn.Message = warn.Message + "\n         REMOTE[" + localItemCommit + "] - " + output
-            }
-        } else {
-            err := git.Fetch(Options.UseRemoteName);
-            if err != nil {
-                fmt.Println("Error fetching")
-            }
-
-            if branch == "Unknown" || branch == "HEAD" {
-                branch = "master"
-            }
-            remoteItemCommit, err := git.GetLatestCommitRemote(Options.UseRemoteName + "/" + branch);
-            if err != nil {
-                remoteItemCommit = "Unknown"
-            }
-            if remoteItemCommit != itemCommit {
-                cmd.IndentAndPrintTree(indentLevel, "  WARNING: Commit is different. " + Options.UseRemoteName + "/" + branch + " " + remoteItemCommit)
-                warn := &WarningItem{Path: item.Path, Name: item.Name}
-                warn.Message = "WARNING: [" + item.Path + "] - The commit in bpm_modules does not match the commit in the remote.";
-
-                output, err := git.Run("git show -s --pretty=\"%an -  %ad - %B\" " + itemCommit)
-                if err != nil {
-                    output = "Could not get commit information"
-                }
-                output = strings.TrimSpace(output);
-                warn.Message = warn.Message + "\n         MODULE[" + itemCommit + "] - " + output
-
-                output, err = git.Run("git show -s --pretty=\"%an -  %ad - %B\" " + Options.UseRemoteName + "/" + branch)
-                if err != nil {
-                    output = "Could not get commit information"
-                }
-                output = strings.TrimSpace(output);
-                warn.Message = warn.Message + "\n         REMOTE[" + remoteItemCommit + "] - " + output
-
-                warnings = append(warnings, warn)
+                warn.Message = warn.Message + "\n         LOCAL[" + localItemCommit + "] - " + output
             }
         }
-
-        // Traverse the hierarchy for the current dependency
-        moduleBpm := &BpmModules{};
-        err = moduleBpm.Load(path.Join(item.Path, Options.BpmCachePath));
+        err = git.Fetch(Options.UseRemoteName);
         if err != nil {
-            cmd.IndentAndPrint(indentLevel, "Error: Could not load dependencies for " + item.Name)
-            continue
+	        cmd.IndentAndPrintTree(indentLevel, "Error: Could not fetch information for remote " + Options.UseRemoteName);
+            warn := &WarningItem{Path: item.Path, Name: item.Name}
+            warn.Message = "Error: [" + item.Path + "] - Error: Could not fetch information for remote " + Options.UseRemoteName;
+            warnings = append(warnings, warn)
+	        goInto(item, indentLevel + 1);
+	        continue;	                    	            	
         }
-        cmd.PrintDependencies(moduleBpm, indentLevel + 1)
+
+		remoteBranch := branch;
+		// If local item is on HEAD, then we will check the master branch on the remote for it's commit information.		
+        if remoteBranch == "HEAD" {
+            remoteBranch = "master"
+        }
+
+        remoteItemCommit, err := git.GetLatestCommitRemote(Options.UseRemoteName + "/" + remoteBranch);
+        if err != nil {
+	        cmd.IndentAndPrintTree(indentLevel, "Error: Could not get remote commit information for " + Options.UseRemoteName + "/" + remoteBranch);
+            warn := &WarningItem{Path: item.Path, Name: item.Name}
+            warn.Message = "Error: [" + item.Path + "] - Error: Could not get remote commit information for " + Options.UseRemoteName + "/" + remoteBranch;
+            warnings = append(warnings, warn)
+	        goInto(item, indentLevel + 1);
+	        continue;	                    	            	
+        }
+        if remoteItemCommit != itemCommit {
+            cmd.IndentAndPrintTree(indentLevel, "  WARNING: Commit is different. " + Options.UseRemoteName + "/" + remoteBranch + " " + remoteItemCommit)
+            warn := &WarningItem{Path: item.Path, Name: item.Name}
+            warn.Message = "WARNING: [" + item.Path + "] - The commit in bpm_modules does not match the commit in the remote.";
+
+            output, err := git.Run("git show -s --pretty=\"%an -  %ad - %B\" " + itemCommit);
+            if err != nil {
+                output = "Error: Could not get commit information";
+            }
+            output = strings.TrimSpace(output);
+            warn.Message = warn.Message + "\n         MODULE[" + itemCommit + "] - " + output;
+
+            output, err = git.Run("git show -s --pretty=\"%an -  %ad - %B\" " + Options.UseRemoteName + "/" + remoteBranch);
+            if err != nil {
+                output = "Error: Could not get commit information";
+            }
+            output = strings.TrimSpace(output);
+            warn.Message = warn.Message + "\n         REMOTE[" + remoteItemCommit + "] - " + output;
+            warnings = append(warnings, warn);
+        }
+        goInto(item, indentLevel + 1);
     }
     return;
 }
@@ -220,6 +265,6 @@ func NewLsCommand() *cobra.Command {
 
     flags := cmd.Flags();
     flags.BoolVar(&myCmd.TreeOnly, "tree-only", false, "Print only the dependency hierarchy")
-    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "")
+    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "Use the specified remote instead of origin")
     return cmd;
 }
