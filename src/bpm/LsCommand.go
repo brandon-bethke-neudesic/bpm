@@ -6,6 +6,7 @@ import (
     "github.com/spf13/cobra"
     "os"
     "strings"
+    "sort"
 )
 
 type LsCommand struct {
@@ -29,17 +30,50 @@ func (cmd *LsCommand) IndentAndPrint(indentLevel int, mytext string){
     fmt.Println(text + mytext)
 }
 
+type Warnings struct {
+	Items map[string] *WarningItem
+}
+
+func (warnings *Warnings) GetSortedKeys() []string {
+    sortedKeys := make([]string, len(warnings.Items))
+    i := 0
+    for k, _ := range warnings.Items {
+        sortedKeys[i] = k
+        i++
+    }
+    sort.Strings(sortedKeys)
+    return sortedKeys;
+}
+
+func (warnings *Warnings) Add(dep *BpmDependency, message string) (*WarningItem) {
+	if warnings.Items == nil {
+		warnings.Items = make(map[string]*WarningItem, 0);
+	}
+	item, exists := warnings.Items[dep.Path];
+	if !exists {
+		item = &WarningItem{Name: dep.Name, Path: dep.Path};
+		item.AddMessage(message);
+		warnings.Items[dep.Path] = item;	
+	} else {
+		item.AddMessage(message);	
+	}	
+	return item;
+}
+
 type WarningItem struct {
-    Path string
     Name string
-    Message string
+    Path string
+    Messages []string
 }
 
-func (warn *WarningItem) String() string {
-	return warn.Message;
+func (warn *WarningItem) AddMessage(message string) {
+	if warn.Messages == nil {
+		warn.Messages = make([]string, 0);
+	}
+	warn.Messages = append(warn.Messages, message);
 }
 
-var warnings []*WarningItem = make([]*WarningItem, 0);
+var warnings = Warnings{};
 
 func (cmd *LsCommand) PrintDependenciesTree(bpm *BpmModules, indentLevel int) {
     // Sort the dependency keys so the dependencies always print in the same order
@@ -82,18 +116,14 @@ func (cmd *LsCommand) PrintDependencies(bpm *BpmModules, indentLevel int) {
         itemCommit, err := git.GetLatestCommit();
         if err != nil {
 	        cmd.IndentAndPrintTree(indentLevel, "--[" + item.Name + "] Error: Could not get commit information for " + item.Path);
-            warn := &WarningItem{Path: item.Path, Name: item.Name}
-            warn.Message = "Error: [" + item.Path + "] - Error: Could not get commit information for " + item.Path;
-            warnings = append(warnings, warn)
+            warnings.Add(item, "Error: Could not get commit information for " + item.Path);
 	        goInto(item, indentLevel + 1);
 	        continue;	        
         }
         branch, err := git.GetCurrentBranch()
         if err != nil {
 	        cmd.IndentAndPrintTree(indentLevel, "--[" + item.Name + "] Error: Could not get branch information for " + item.Path);
-            warn := &WarningItem{Path: item.Path, Name: item.Name}
-            warn.Message = "Error: [" + item.Path + "] - Error: Could not get branch information for " + item.Path;
-            warnings = append(warnings, warn)
+            warnings.Add(item, "Error: Could not get branch information for " + item.Path);
 	        goInto(item, indentLevel + 1);
 	        continue;
         }
@@ -101,19 +131,16 @@ func (cmd *LsCommand) PrintDependencies(bpm *BpmModules, indentLevel int) {
 
         if git.HasChanges() {
             cmd.IndentAndPrintTree(indentLevel, "  WARNING: Contains uncommitted changes")
-            warn := &WarningItem{Path: item.Path, Name: item.Name}
-            warn.Message = "WARNING: [" + item.Path + "] - There are uncommitted changes.";
-            warnings = append(warnings, warn)
-        }
-
+            warnings.Add(item, "Warning: There are uncommitted changes. Run: 'bpm status " + strings.Replace(item.Path, "bpm_modules/", "", -1) + "'");
+        }        
+        commitMismatchWarning := "";
+        printedModuleCommit := false;
         localRemote := git.GetRemote("local");
         if localRemote != nil {
             err := git.Fetch("local");
             if err != nil {
 		        cmd.IndentAndPrintTree(indentLevel, "Error: Could not fetch information for remote local at " + localRemote.Url);
-	            warn := &WarningItem{Path: item.Path, Name: item.Name}
-	            warn.Message = "Error: [" + item.Path + "] - Error: Could not fetch information for remote local at " + localRemote.Url;
-	            warnings = append(warnings, warn)
+	            warnings.Add(item, "Error: Could not fetch information for remote local at " + localRemote.Url);
 		        goInto(item, indentLevel + 1);
 		        continue;	                    	
             }
@@ -122,47 +149,41 @@ func (cmd *LsCommand) PrintDependencies(bpm *BpmModules, indentLevel int) {
             localItemCommit, err := localGit.GetLatestCommit();
             if err != nil {
 		        cmd.IndentAndPrintTree(indentLevel, "Error: Could not get remote commit information for " + localRemote.Url);
-	            warn := &WarningItem{Path: item.Path, Name: item.Name}
-	            warn.Message = "Error: [" + item.Path + "] - Error: Could not get remote commit information for " + localRemote.Url;
-	            warnings = append(warnings, warn)
+	            warnings.Add(item, "Error: Could not get remote commit information for " + localRemote.Url);
 		        goInto(item, indentLevel + 1);
 		        continue;	                    	
             }
             localBranch, err := localGit.GetCurrentBranch()
             if err != nil {
 		        cmd.IndentAndPrintTree(indentLevel, "Error: Could not get remote branch information for " + localRemote.Url);
-	            warn := &WarningItem{Path: item.Path, Name: item.Name}
-	            warn.Message = "Error: [" + item.Path + "] - Error: Could not get remote branch information for " + localRemote.Url;
-	            warnings = append(warnings, warn)
+	            warnings.Add(item, "Error: Could not get remote branch information for " + localRemote.Url);
 		        goInto(item, indentLevel + 1);
 		        continue;	        
             }
+            remotePath := "local/" + localBranch
 
             if localItemCommit != itemCommit {
-                cmd.IndentAndPrintTree(indentLevel, "  WARNING: Commit is different. local/" + localBranch + " " + localItemCommit)
-                warn := &WarningItem{Path: item.Path, Name: item.Name}
-                warn.Message = "WARNING: [" + item.Path + "] - The commit in bpm_modules does not match the commit in the remote.";
-                warnings = append(warnings, warn)
+                cmd.IndentAndPrintTree(indentLevel, "  WARNING: Commit is different. " + remotePath + " " + localItemCommit)                
+                commitMismatchWarning = "Warning: The commit in bpm_modules does not match the commit in the remote.\n";
                 output, err := git.Run("git show -s --pretty=\"%an -  %ad - %B\" " + itemCommit)
                 if err != nil {
                     output = "Error: Could not get commit information"
                 }
                 output = strings.TrimSpace(output);
-                warn.Message = warn.Message + "\n         MODULE[" + itemCommit + "] - " + output
+                commitMismatchWarning = commitMismatchWarning + "           bpm_module [" + itemCommit + "] - " + output + "\n";
+                printedModuleCommit = true;
                 output, err = localGit.Run("git show -s --pretty=\"%an -  %ad - %B\" " + localItemCommit)
                 if err != nil {
                     output = "Error: Could not get commit information"
                 }
                 output = strings.TrimSpace(output);
-                warn.Message = warn.Message + "\n         LOCAL[" + localItemCommit + "] - " + output
+                commitMismatchWarning = commitMismatchWarning + "           " + remotePath + " [" + localItemCommit + "] - " + output + "\n";
             }
         }
         err = git.Fetch(Options.UseRemoteName);
         if err != nil {
 	        cmd.IndentAndPrintTree(indentLevel, "Error: Could not fetch information for remote " + Options.UseRemoteName);
-            warn := &WarningItem{Path: item.Path, Name: item.Name}
-            warn.Message = "Error: [" + item.Path + "] - Error: Could not fetch information for remote " + Options.UseRemoteName;
-            warnings = append(warnings, warn)
+            warnings.Add(item, "Error: Could not fetch information for remote " + Options.UseRemoteName);
 	        goInto(item, indentLevel + 1);
 	        continue;	                    	            	
         }
@@ -173,35 +194,37 @@ func (cmd *LsCommand) PrintDependencies(bpm *BpmModules, indentLevel int) {
             remoteBranch = "master"
         }
 
-        remoteItemCommit, err := git.GetLatestCommitRemote(Options.UseRemoteName + "/" + remoteBranch);
+		remotePath := Options.UseRemoteName + "/" + remoteBranch;
+        remoteItemCommit, err := git.GetLatestCommitRemote(remotePath);
         if err != nil {
-	        cmd.IndentAndPrintTree(indentLevel, "Error: Could not get remote commit information for " + Options.UseRemoteName + "/" + remoteBranch);
-            warn := &WarningItem{Path: item.Path, Name: item.Name}
-            warn.Message = "Error: [" + item.Path + "] - Error: Could not get remote commit information for " + Options.UseRemoteName + "/" + remoteBranch;
-            warnings = append(warnings, warn)
+	        cmd.IndentAndPrintTree(indentLevel, "Error: Could not get remote commit information for " + remotePath);
+            warnings.Add(item, "Error: Could not get remote commit information for " + remotePath);
 	        goInto(item, indentLevel + 1);
 	        continue;	                    	            	
         }
         if remoteItemCommit != itemCommit {
-            cmd.IndentAndPrintTree(indentLevel, "  WARNING: Commit is different. " + Options.UseRemoteName + "/" + remoteBranch + " " + remoteItemCommit)
-            warn := &WarningItem{Path: item.Path, Name: item.Name}
-            warn.Message = "WARNING: [" + item.Path + "] - The commit in bpm_modules does not match the commit in the remote.";
-
-            output, err := git.Run("git show -s --pretty=\"%an -  %ad - %B\" " + itemCommit);
+            cmd.IndentAndPrintTree(indentLevel, "  WARNING: Commit is different. " + remotePath + " " + remoteItemCommit)
+            if commitMismatchWarning == "" {			
+				commitMismatchWarning = "Warning: The commit in bpm_modules does not match the commit in the remote.\n";
+            }
+            if !printedModuleCommit {			
+	            output, err := git.Run("git show -s --pretty=\"%an -  %ad - %B\" " + itemCommit);
+	            if err != nil {
+	                output = "Error: Could not get commit information";
+	            }
+	            output = strings.TrimSpace(output);
+				commitMismatchWarning = commitMismatchWarning + "           bpm_module [" + itemCommit + "] - " + output + "\n";
+            }
+            output, err := git.Run("git show -s --pretty=\"%an -  %ad - %B\" " + remotePath);
             if err != nil {
                 output = "Error: Could not get commit information";
             }
             output = strings.TrimSpace(output);
-            warn.Message = warn.Message + "\n         MODULE[" + itemCommit + "] - " + output;
-
-            output, err = git.Run("git show -s --pretty=\"%an -  %ad - %B\" " + Options.UseRemoteName + "/" + remoteBranch);
-            if err != nil {
-                output = "Error: Could not get commit information";
-            }
-            output = strings.TrimSpace(output);
-            warn.Message = warn.Message + "\n         REMOTE[" + remoteItemCommit + "] - " + output;
-            warnings = append(warnings, warn);
+            commitMismatchWarning = commitMismatchWarning + "           " + remotePath + " [" + remoteItemCommit + "] - " + output;
         }
+        if commitMismatchWarning != "" {
+	        warnings.Add(item, commitMismatchWarning);
+        }    
         goInto(item, indentLevel + 1);
     }
     return;
@@ -228,14 +251,20 @@ func (cmd *LsCommand) Execute() (error) {
     }
     fmt.Println("")
 
-    if len(warnings) > 0 {
+    if len(warnings.Items) > 0 {
         fmt.Println("***************")
     }
-    for _, warning := range warnings {
-        fmt.Println(warning.Message);
-        fmt.Println();
+    
+    sorted := warnings.GetSortedKeys();
+    for _, itemName := range sorted {
+        warning := warnings.Items[itemName]
+    	fmt.Println("[" + warning.Path + "]");
+    	fmt.Println();
+    	for _, message := range warning.Messages {
+	        fmt.Println("  " + message);
+	        fmt.Println();    	
+    	}    	
     }
-
     return nil;
 }
 
