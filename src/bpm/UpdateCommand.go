@@ -83,10 +83,11 @@ func NewUpdateCommand() *cobra.Command {
     }
 
     flags := cmd.Flags();
+    flags.StringVar(&Options.UseRemoteUrl, "remoteurl", "", "Use the specified remote url instead of origin. Ex: bpm update --remoteurl https://neudesic.timu.com/projects/timu/code/xcom/israd.git")    
     flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the dependent repos can be found. Ex: bpm install --root=..")
     flags.BoolVar(&Options.Deep, "deep", false, "Update all dependencies in the bpm modules hierachy");
     flags.BoolVar(&Options.SkipNpmInstall, "skipnpm", false, "Do not perform a npm install")
-    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "")
+    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "Use the specified remote instead of origin")
 
     return cmd
 }

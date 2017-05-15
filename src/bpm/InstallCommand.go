@@ -77,5 +77,9 @@ func NewInstallCommand() *cobra.Command {
             }
         },
     }
+
+	flags := cmd.Flags();    
+    flags.StringVar(&Options.PackageManager, "pkgm", "npm", "Use the specified package manager to install the component. npm or yarn")
+
     return cmd
 }

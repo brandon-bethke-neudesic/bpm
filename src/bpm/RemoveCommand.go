@@ -102,7 +102,7 @@ func NewRemoveCommand() *cobra.Command {
     }
 
     flags := cmd.Flags();
-    flags.BoolVar(&myCmd.Npm, "npm", false, "call npm uninstall")
+    flags.BoolVar(&myCmd.Npm, "npm", false, "call npm uninstall on the specified item")
 
     return cmd
 }
