@@ -1,5 +1,5 @@
 #!/bin/bash
-if [[ "$GOPATH" == "" ]]; then
+if [[ "$1" != "preserve-go-path" ]]; then
     export GOPATH=`pwd`
 fi
 
