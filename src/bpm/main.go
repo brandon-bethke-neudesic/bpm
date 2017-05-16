@@ -28,11 +28,11 @@ func SliceIndex(limit int, predicate func(i int) bool) int {
 }
 
 func PathExists(location string) (bool) {
-    stat, err := os.Stat(location)
-    if err == nil && stat.IsDir() {
-        return true
+    _, err := os.Stat(location)
+    if err != nil && os.IsNotExist(err){
+	    return false;
     }
-    return false;
+    return true;
 }
 
 func UseLocal(url string) bool {
