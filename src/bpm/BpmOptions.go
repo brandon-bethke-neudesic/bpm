@@ -4,21 +4,16 @@ import (
     "strings"
     "path"
     "os"
-    "bpmerror"
 )
 
 
 type BpmOptions struct {
     Deep bool
     RootComponent string
-    Recursive bool
-    ConflictResolutionType string
     UseLocalPath string
     UseRemoteName string
     UseRemoteUrl string
     BpmCachePath string
-    BpmFileName string
-    LocalModuleName string
     ExcludeFileList string
     SkipNpmInstall bool
     PackageManager string
@@ -32,17 +27,7 @@ func (options *BpmOptions) EnsureBpmCacheFolder() {
     }
 }
 
-func (options *BpmOptions) BpmFileExists() (bool) {
-    if _, err := os.Stat(Options.BpmFileName); os.IsNotExist(err) {
-        return false
-    }
-    return true
-}
-
 func (options *BpmOptions) Validate() error {
-    if options.Recursive && options.UseLocalPath == "" {
-        return bpmerror.New(nil, "Error: The --recursive option can only be used with the --root= option")
-    }
     return nil
 }
 

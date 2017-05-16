@@ -76,7 +76,8 @@ func (dep *BpmDependency) CopyChanges(source string, destination string) error {
     }
 
     if len(files) > 0 || updatePackageJson {
-        UpdatePackageJsonVersion(source);
+	    pj := PackageJson{Path: source}
+	    pj.UpdateVersion();    	
         err = copyDir.CopyFile(path.Join(source, "package.json"), path.Join(destination, "package.json"));
         if err != nil {
             return err;

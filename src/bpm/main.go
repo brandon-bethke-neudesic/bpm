@@ -15,8 +15,6 @@ import (
 var moduleCache = ModuleCache{Items:make(map[string]*ModuleCacheItem)};
 var Options = BpmOptions {
     BpmCachePath: "bpm_modules",
-    BpmFileName: "bpm.json",
-    LocalModuleName: "local",
     ExcludeFileList: ".git|.gitignore|.gitmodules|bpm_modules|node_modules",
 }
 
@@ -37,7 +35,6 @@ func PathExists(location string) (bool) {
     return false;
 }
 
-
 func UseLocal(url string) bool {
     if Options.UseLocalPath != "" && !strings.HasPrefix(url, "http") {
         return true;
@@ -45,10 +42,9 @@ func UseLocal(url string) bool {
     return false;
 }
 
-
 func EnsurePath(path string){
     if _, err := os.Stat(path); os.IsNotExist(err) {
-        os.MkdirAll(path, 0777)
+        os.MkdirAll(path, 0777);
     }
 }
 
