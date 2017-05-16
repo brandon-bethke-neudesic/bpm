@@ -7,7 +7,8 @@ go get bpm
 if [[ $? -ne 0 ]]; then
     exit 1
 fi
-go install bpm
+BUILD_NUMBER=$(date -u +%Y%m%d%H%M%S)
+go install -a -ldflags "-X main.TpmBuildNumber=$BUILD_NUMBER" bpm
 if [[ $? -ne 0 ]]; then
     exit 1
 fi
