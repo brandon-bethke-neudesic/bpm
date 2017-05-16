@@ -42,12 +42,6 @@ func UseLocal(url string) bool {
     return false;
 }
 
-func EnsurePath(path string){
-    if _, err := os.Stat(path); os.IsNotExist(err) {
-        os.MkdirAll(path, 0777);
-    }
-}
-
 func UpdatePackageJsonVersion(location string) (error) {
     pj := PackageJson{Path: location}
     err := pj.Load();
