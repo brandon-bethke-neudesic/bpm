@@ -65,7 +65,7 @@ func (cmd *AddCommand) Execute() (error) {
 func NewAddCommand() *cobra.Command {
     myCmd := &AddCommand{}
     cmd := &cobra.Command{
-        Use:   "add [COMPONENT]",
+        Use:   "add [URL]",
         Short: "add the specified item as a dependency",
         Long:  "add the specified item as a dependency",
         PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -83,9 +83,9 @@ func NewAddCommand() *cobra.Command {
     }
 
     flags := cmd.Flags();
-    flags.StringVar(&Options.UseRemoteUrl, "remoteurl", "", "Use the specified remote url instead of origin. Ex: bpm update --remoteurl https://neudesic.timu.com/projects/timu/code/xcom/israd.git")        
-    flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the dependent repos can be found. Ex: bpm install --root=..")
-    flags.StringVar(&myCmd.Name, "name", "", "When installing a new component, use the specified name for the component instead of the name from the .git url. Ex: bpm install https://www.github.com/sample/js-sample.git --sample")
-    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "")
+    flags.StringVar(&Options.UseRemoteUrl, "remoteurl", "", "Use the specified remote url instead of origin. Ex: bpm add ../myrepository.git --remoteurl https://neudesic.timu.com/projects/timu/code/xcom/israd.git")        
+    flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the dependent repos can be found. Ex: bpm add ../myrepository.git --root=..")
+    flags.StringVar(&myCmd.Name, "name", "", "When installing a new component, use the specified name for the component instead of the name from the .git url. Ex: bpm install https://www.github.com/sample/js-sample.git --name sample")
+    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "Use the specified remote as the base url")
     return cmd;
 }

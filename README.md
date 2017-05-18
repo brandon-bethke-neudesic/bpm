@@ -1,229 +1,56 @@
-Updates:
+#### Overview
 
-    clone the first time, then do pulls
+bpm is a tool to help to keep submodules in the `bpm_modules` folder updated with local and remote changes. It will also npm install these dependencies.
 
 
-Another package manager for nodejs projects
+#### Build bpm
 
-How to build the bpm
-
-./build.sh
+	./build.sh
 
 This script will create a symbolic link for bpm in the /usr/local/bin folder.
-It also creates the linux and darwin version of the app.
+The script will also create a linux binary.
+If the `TPM_CLUSTER_HOME` variable is set then the linux version will be copied to `TPM_CLUSTER_HOME/includes/bpm/bin/linux` 
 
-Overview of the bpm.json file structure.
 
-    {
-        "name" : "my-component",
-        "version" : "1.0.0",
-        "dependencies" : {
-            "my-depencency-1" : {
-                "url" : "../my-depencency-1.git"
-            }
-        }
-    }
+#### Install
 
-name: The name of the component. Generally this is the same name as the git repo.
+	bpm install [NAME]
 
-version: The version number of the component. Versioning is used to resolve conflicts that may arise when computing the dependency tree.
+npm install the direct dependency with the specified name. If no name is specified, then all dependencies will be installed.
 
-dependencies: A map of the dependencies. The map key is the name of the dependency
 
-dependency map item
+#### Update
 
-url: The full or relative URL to the repository
+	bpm update [NAME] [OPTIONS]
+	 
+Update the direct dependency with the specified name. If no name is specified, then all direct dependencies will be updated.
 
-Install dependencies
-Dependencies specified in the bpm.json are installed using the `bpm install` command. bpm requires git and the repository where the bpm command is run must be a git repository with at least a remote of origin.
+#### Listing
 
-    bpm install [--remote=myremote] | [--root=mypath]
+	bpm ls 
+	
+List the dependency heirarchy.
 
-Example:
+#### Add
 
-    bpm install
-    bpm install --root=../js
-    bpm install --remote=brandon
+	bpm add [URL] [OPTIONS]
 
-For example, given the following bpm.json for the repository my-component
+Add the specified URL as a submodule in the bpm_modules folder.
+If the --root option is specified then the module will also be updated.
 
-    {
-        "name" : "my-component",
-        "version" : "1.0.0",
-        "dependencies" : {
-            "my-depencency-1" : {
-                "url" : "../my-depencency-1.git"
-            }
-        }
-    }
+#### Remove
 
-The bpm command will:
+	bpm remove [NAME] [OPTIONS]
+	
+Remove the specified submodule. If no items is specified, then all submodules will be removed.
 
-- clone the repository in the bpm_modules folder
-- run a supported package manager install on my-component/hash. (npm or yarn)
+#### Status
 
-In this example, the URL is relative. Dependency URLs can be a full URL or a relative URL. For any dependency that has a relative url, the `--remote` option will be used to resolve the relative url to a full url. origin is the default remote. Therefore, if the origin is http://github.com/user/my-component.git, then the dependency url will be resolved to http://github.com/user/my-depencency-1.git
+	bpm status NAME
+	
+Perform a git status on the specified dependency. The name can be a path but exclude the bpm_modules dirtories.
 
-The dependency url and commit are required to correctly install a dependency.
-
-When the --root option is used, instead of downloading the code from the dependency url, bpm will attempt to locate the dependency on the local disk relative to the specified root.
-
-Given the command
-    bpm install --root=../mydependencies
-
-bpm will expect the following folder structure on disk and ignore the specified url and commit hash for each dependency.
-
-    mycomponent\
-    mydependencies\
-        my-dependency-1\
-
-Install a single existing dependency.
-
-    bpm install [name]
-
-Example:
-
-    bpm install my-dependency-1
-
-Install a new dependency.
-Install a new dependency and save to the bpm.json. The repository being installed must contain a bpm.json file
-The url parameter can be a relative URL or a full URL. The relative URL will be relative to the specified remote or origin by default
-
-    bpm install [url] [--remote=origin]
-
-Example:
-
-    bpm install ../mortar.git
-    bpm install ../mortar.git --remote=brandon
-    bpm install https://neudesic.timu.com/projects/timu/code/master/mortar.git
-
-The version number in the bpm.json will be incremented automatically when the install command is used.
-
-Update the dependency to the latest
-
-    bpm update [dependencyName] [--remote=myremote | --root=mypath] [--recursive]
-
-Example:
-
-    bpm update
-    bpm update --root=../js
-    bpm update mortar
-    bpm update mortar --remote=brandon
-    bpm update mortar --root=../mydependencies
-    bpm update mortar --root=../mydependencies
-
-The version number in the bpm.json will be incremented automatically when a dependency has changed.
-
-Uninstall a dependency.
-Removed the dependency from bpm_modules and performs an npm uninstall [depName]
-
-    bpm uninstall [dependencyName]
-
-Example:
-
-    bpm uninstall mortar
-
-
-Create a default bpm.json
-
-    bpm init <modulename>
-
-Example:
-
-    bpm init my-component
-
-Clean the bpm_modules
-
-    bpm clean
-
-Sample bpm.json files for repositories login-client, mortar and null-query
-
-my-component bpm.json
-
-    {
-        "name" : "my-component",
-        "version" : "1.0.0",
-        "dependencies" : {
-            "my-depencency-1" : {
-                "url" : "../my-depencency-1.git"
-            },
-            "my-depencency-2":{
-                "url" :"../my-dependency-2.git"
-            }
-        }
-    }
-
-my-depencency-1 bpm.json
-
-    {
-        "name" : "my-depencency-1",
-        "version" : "1.0.1",
-        "dependencies" : {
-            "my-depencency-2" : {
-                "url" : "../my-depencency-2.git"
-            }
-        }
-    }
-
-my-depencency-2 bpm.json
-
-    {
-        "name" : "my-depencency-2",
-        "version" : "1.0.0",
-        "dependencies": {}
-    }
-
-
-Expected layout on disk for the above example since relative URLs are used.
-
-    dev\
-        my-component\
-        my-depencency-1\
-        my-depencency-2\
-
-
-// disk
-When bpm is run a bpm_modules folder will be created which contains copies of the repositories which are then copied into the node_modules folder
-
-    my-component\
-        package.json
-        bpm.json
-        bpm_modules\
-            my-depencency-1\
-            my-depencency-2\
-        node_modules\
-            my-depencency-1\
-            my-depencency-2\
-        src\
-            main.js
-
-
-bpm module cache
-
-When the bpm command is run any existing items in the bpm_module cache will be used and the dependency will not be redownloaded. Additionally, if the local folder exists for the component in the module cache, then this cache item will always be used even if the cache does not contain an item for the dependency hash
-
-Dependency conflict resolution.
-
-It is possible that the dependency tree will contain multiple reference to the same dependency. It is also possible that the commit hash for those dependencies will be different. In this case, the version number of the dependency in the dependency's bpm.json file will be compared and the latest version will be used.
-
-Example:
-
-- my-component has dependency-2 with commit X, and the dependency-2's bpm.json file for commit X is version 1.0.0
-- my-component has dependency-1 and dependency-1 also contains dependency-2 but with commit Y, and dependency-2's bpm.json file for commit Y is version 1.0.1
-
-In this case, version 1.0.1 of dependency-2 will be used.
-
-Using the --resolution option, it is possible to specify an alternative conflict resolution strategy.
-
-The option `--resolution=revisionlist` will attempt to determine which commit is the latest commit using the git revision history.
-
-The option `--skipnpm` will skip the package manager install phase.
-
-The option `--remoteurl=https://host/path.git` will cause bpm to use the specified url as the remote url for all relative path rather than the remote name.
-
-Supported Package Managers
-
-bpm supports npm and yarn. To specify a package manger use the --pkgm= option. By default npm is used.
-
-    bpm --pkgm=yarn [--yarn-packages-root=] [--yarn-modules-folder=]
-    bpm --pkgm=npm
+Examples:
+	
+	bpm status bpmdep2
+	bpm status bpmdep3/bpmdep1
