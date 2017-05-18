@@ -20,6 +20,13 @@ func (cmd *InstallCommand) Initialize() (error) {
     return nil;
 }
 
+func (cmd *InstallCommand) Description() (string){
+	return `
+	
+Run npm install on each dependency in the hierarchy.
+`
+}
+
 func (cmd *InstallCommand) Execute() (error) {
     bpm := BpmModules{}
     err := bpm.Load(Options.BpmCachePath);
@@ -63,7 +70,7 @@ func NewInstallCommand() *cobra.Command {
     cmd := &cobra.Command{
         Use:   "install [NAME]",
         Short: "install the specified component",
-        Long:  "install the specified component",
+        Long:  myCmd.Description(),
         PreRunE: func(cmd *cobra.Command, args []string) error {
             myCmd.Args = args;
             return myCmd.Initialize();

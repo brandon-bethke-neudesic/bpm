@@ -61,7 +61,6 @@ func (cmd *AddCommand) Execute() (error) {
     return nil;
 }
 
-
 func NewAddCommand() *cobra.Command {
     myCmd := &AddCommand{}
     cmd := &cobra.Command{
@@ -83,9 +82,10 @@ func NewAddCommand() *cobra.Command {
     }
 
     flags := cmd.Flags();
-    flags.StringVar(&Options.UseRemoteUrl, "remoteurl", "", "Use the specified remote url instead of origin. Ex: bpm add ../myrepository.git --remoteurl https://neudesic.timu.com/projects/timu/code/xcom/israd.git")        
-    flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the dependent repos can be found. Ex: bpm add ../myrepository.git --root=..")
+    flags.StringVar(&Options.RemoteUrl, "remoteurl", "", "Use the specified remote base url instead of the base url from origin. Ex: bpm add ../myrepository.git --remoteurl https://neudesic.timu.com/projects/timu/code/xcom")        
+    flags.StringVar(&Options.Local, "root", "", "A relative local path where the dependent repos can be found. Ex: bpm add ../myrepository.git --root=..")
     flags.StringVar(&myCmd.Name, "name", "", "When installing a new component, use the specified name for the component instead of the name from the .git url. Ex: bpm install https://www.github.com/sample/js-sample.git --name sample")
-    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "Use the specified remote as the base url")
+    flags.StringVar(&Options.Remote, "remote", "origin", "Use the specified remote as the base url when not using --root")
+    flags.StringVar(&Options.Branch, "branch", "master", "Use the specified branch instead master when not using --root");
     return cmd;
 }

@@ -180,10 +180,10 @@ func (cmd *LsCommand) PrintDependencies(bpm *BpmModules, indentLevel int) {
                 commitMismatchWarning = commitMismatchWarning + "           " + remotePath + " [" + localItemCommit + "] - " + output + "\n";
             }
         }
-        err = git.Fetch(Options.UseRemoteName);
+        err = git.Fetch(Options.Remote);
         if err != nil {
-	        cmd.IndentAndPrintTree(indentLevel, "Error: Could not fetch information for remote " + Options.UseRemoteName);
-            warnings.Add(item, "Error: Could not fetch information for remote " + Options.UseRemoteName);
+	        cmd.IndentAndPrintTree(indentLevel, "Error: Could not fetch information for remote " + Options.Remote);
+            warnings.Add(item, "Error: Could not fetch information for remote " + Options.Remote);
 	        goInto(item, indentLevel + 1);
 	        continue;	                    	            	
         }
@@ -194,7 +194,7 @@ func (cmd *LsCommand) PrintDependencies(bpm *BpmModules, indentLevel int) {
             remoteBranch = "master"
         }
 
-		remotePath := Options.UseRemoteName + "/" + remoteBranch;
+		remotePath := Options.Remote + "/" + remoteBranch;
         remoteItemCommit, err := git.GetLatestCommitRemote(remotePath);
         if err != nil {
 	        cmd.IndentAndPrintTree(indentLevel, "Error: Could not get remote commit information for " + remotePath);
@@ -294,6 +294,6 @@ func NewLsCommand() *cobra.Command {
 
     flags := cmd.Flags();
     flags.BoolVar(&myCmd.TreeOnly, "tree-only", false, "Print only the dependency hierarchy")
-    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "Use the specified remote instead of origin")
+    flags.StringVar(&Options.Remote, "remote", "origin", "Use the specified remote instead of origin")
     return cmd;
 }

@@ -314,6 +314,13 @@ func (git *GitExec) InitAndCheckout(url string, commit string) error {
     return git.SubmoduleUpdate(true, true)
 }
 
+func (git *GitExec) Merge(remote string, branch string) error {
+    gitCommand := "git merge " + remote + "/" + branch;
+    rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}
+    _, err := rc.Run(gitCommand);
+    return err;	
+}
+
 func (git *GitExec) Pull(remote string, branch string) error {
     gitCommand := "git pull " + remote + " " + branch;
     rc := OsExec{Dir: git.Path, LogOutput: git.LogOutput}

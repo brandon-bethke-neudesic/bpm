@@ -8,10 +8,32 @@ import (
     "github.com/spf13/cobra"
 )
 
-
 type UpdateCommand struct {
     Args []string
     Name string
+}
+
+func (cmd *UpdateCommand) Description() (string) {
+    return `
+    
+Update a dependency then run npm install.
+
+Examples:
+
+	# Update all direct dependencies and using the local path as the source repo
+	bpm update --root=../js	
+	bpm update --root=../js --skipnpm
+	
+	# Update just the groupscale depdendency
+	bpm update groupscale --root=../js --skipnpm
+
+	# Update the groupscale dependency and use the base url specified by the remote brandon as the source repo
+	bpm update groupscale --remote brandon
+	
+	# Update the groupscale dependency and use the base url specified
+	bpm update groupscale --remoteurl https://neudesic.timu.com/projects/timu/code/brandon-bethke --skipnpm
+`
+	
 }
 
 func (cmd *UpdateCommand) Initialize() (error) {
@@ -55,7 +77,7 @@ func (cmd *UpdateCommand) Execute() (error) {
         }
     }
 
-    if !Options.SkipNpmInstall {
+    if !Options.SkipNpm {
         err = moduleCache.Install()
         if err != nil {
             return bpmerror.New(err, "Error: There was an issue performing npm install on the dependencies")
@@ -70,7 +92,7 @@ func NewUpdateCommand() *cobra.Command {
     cmd := &cobra.Command{
         Use:   "update [NAME]",
         Short: "update the specified component",
-        Long:  "update the specified component",
+        Long:  myCmd.Description(),
         PreRunE: func(cmd *cobra.Command, args []string) error {
             myCmd.Args = args;
             return myCmd.Initialize();
@@ -86,11 +108,12 @@ func NewUpdateCommand() *cobra.Command {
     }
 
     flags := cmd.Flags();
-    flags.StringVar(&Options.UseRemoteUrl, "remoteurl", "", "Use the specified remote url instead of origin. Ex: bpm update --remoteurl https://neudesic.timu.com/projects/timu/code/xcom/israd.git")    
-    flags.StringVar(&Options.UseLocalPath, "root", "", "A relative local path where the dependent repos can be found. Ex: bpm install --root=..")
+    flags.StringVar(&Options.RemoteUrl, "remoteurl", "", "Use the specified remote base url instead of the base url from origin. Ex: bpm add ../myrepository.git --remoteurl https://neudesic.timu.com/projects/timu/code/xcom")        
+    flags.StringVar(&Options.Local, "root", "", "A relative local path where the dependent repos can be found. Ex: bpm install --root=..")
     flags.BoolVar(&Options.Deep, "deep", false, "Update all dependencies in the bpm modules hierachy");
-    flags.BoolVar(&Options.SkipNpmInstall, "skipnpm", false, "Do not perform a npm install")
-    flags.StringVar(&Options.UseRemoteName, "remote", "origin", "Use the specified remote instead of origin")
+    flags.BoolVar(&Options.SkipNpm, "skipnpm", false, "Do not perform a npm install")
+    flags.StringVar(&Options.Remote, "remote", "origin", "Use the specified remote instead of origin when not using --root")
+    flags.StringVar(&Options.Branch, "branch", "master", "Use the specified branch instead master when not using --root");
 
     return cmd
 }

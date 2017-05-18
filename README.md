@@ -17,19 +17,21 @@ If the `TPM_CLUSTER_HOME` variable is set then the linux version will be copied 
 	bpm install [NAME]
 
 npm install the direct dependency with the specified name. If no name is specified, then all dependencies will be installed.
-
+The install command does not perform an update.
 
 #### Update
 
 	bpm update [NAME] [OPTIONS]
 	 
 Update the direct dependency with the specified name. If no name is specified, then all direct dependencies will be updated.
+The update command will always perform npm install unless the --skipnpm flag is specified.
+
 
 #### Listing
 
 	bpm ls 
 	
-List the dependency heirarchy.
+List the dependency hierarchy.
 
 #### Add
 

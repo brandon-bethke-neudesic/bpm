@@ -10,15 +10,15 @@ import (
 type BpmOptions struct {
     Deep bool
     RootComponent string
-    UseLocalPath string
-    UseRemoteName string
-    UseRemoteUrl string
+    Local string
+    Remote string
+    RemoteUrl string
     BpmCachePath string
     ExcludeFileList string
-    SkipNpmInstall bool
+    SkipNpm bool
     PackageManager string
     WorkingDir string
-    UseParentUrl bool
+    Branch string
 }
 
 func (options *BpmOptions) EnsureBpmCacheFolder() {

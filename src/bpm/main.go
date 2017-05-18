@@ -36,7 +36,7 @@ func PathExists(location string) (bool) {
 }
 
 func UseLocal(url string) bool {
-    if Options.UseLocalPath != "" && !strings.HasPrefix(url, "http") {
+    if Options.Local != "" && !strings.HasPrefix(url, "http") {
         return true;
     }
     return false;
@@ -57,20 +57,20 @@ func UpdatePackageJsonVersion(location string) (error) {
 func MakeRemoteUrl(itemUrl string) (string, error) {
     if UseLocal(itemUrl) {
         _, name := filepath.Split(itemUrl)
-        return path.Join(Options.UseLocalPath, strings.Split(name, ".git")[0]), nil;
+        return path.Join(Options.Local, strings.Split(name, ".git")[0]), nil;
     }
     adjustedUrl := itemUrl;
     if !strings.HasPrefix(adjustedUrl, "http") {
         var remoteUrl string;
 
         relative := "";
-        if Options.UseRemoteUrl != "" {
-            remoteUrl = Options.UseRemoteUrl;
+        if Options.RemoteUrl != "" {
+            remoteUrl = Options.RemoteUrl;
         } else {
             git := GitExec{LogOutput: true}
-            remote := git.GetRemote(Options.UseRemoteName)
+            remote := git.GetRemote(Options.Remote)
             if remote == nil {
-                return "", errors.New("Error: There was a problem getting the remote url " + Options.UseRemoteName)
+                return "", errors.New("Error: There was a problem getting the remote url " + Options.Remote)
             }
             remoteUrl = remote.Url;
             relative = "..";
@@ -85,7 +85,7 @@ func MakeRemoteUrl(itemUrl string) (string, error) {
         if !strings.HasSuffix(adjustedUrl, ".git") {
             adjustedUrl = adjustedUrl + ".git";
         }
-        fmt.Println("Adjusted Url", adjustedUrl)
+        fmt.Println("Using remote Url", adjustedUrl)
     }
     return adjustedUrl, nil;
 }

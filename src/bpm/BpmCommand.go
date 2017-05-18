@@ -42,8 +42,8 @@ func NewBpmCommand() (*cobra.Command) {
     )
     Options.WorkingDir, _ = os.Getwd();
 
-    if strings.Index(Options.UseLocalPath, ".") == 0 || strings.Index(Options.UseLocalPath, "..") == 0 {
-        Options.UseLocalPath = path.Join(Options.WorkingDir, Options.UseLocalPath)
+    if strings.Index(Options.Local, ".") == 0 || strings.Index(Options.Local, "..") == 0 {
+        Options.Local = path.Join(Options.WorkingDir, Options.Local)
     }
     return cmd
 }

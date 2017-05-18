@@ -69,8 +69,10 @@ func (dep *BpmDependency) CopyChanges(source string, destination string) error {
     }
 
     if len(files) > 0 || updatePackageJson {
-	    pj := PackageJson{Path: source}
-	    pj.UpdateVersion();    	
+    	err = UpdatePackageJsonVersion(source);
+        if err != nil {
+            return err;
+        }
         err = copyDir.CopyFile(path.Join(source, "package.json"), path.Join(destination, "package.json"));
         if err != nil {
             return err;
@@ -79,22 +81,22 @@ func (dep *BpmDependency) CopyChanges(source string, destination string) error {
     return nil;
 }
 
-func (dep *BpmDependency) SwitchBranches(source string, destination string) error {
+func (dep *BpmDependency) SwitchBranches(source string, destination string) (string, error) {
     // Get all the changed files in the source repository, exluding deleted files, and copy them to the destination repository.
     gitSource := GitExec{Path: source}
     gitDestination := GitExec{Path: destination}
     branch, err := gitSource.GetCurrentBranch();
     if err != nil {
-        return bpmerror.New(err, "Error: Could not find the current branch in the source repository");
+        return "", bpmerror.New(err, "Error: Could not find the current branch in the source repository");
     }
     if branch != "HEAD" {
         fmt.Println("Source repository is on branch " + branch + ". Switching to branch " + branch);
         err := gitDestination.Checkout(branch)
         if err != nil {
-            return bpmerror.New(err, "Error: Could not switch to branch " + branch + " in the destination repository")
+            return "", bpmerror.New(err, "Error: Could not switch to branch " + branch + " in the destination repository")
         }
     }
-    return nil;
+    return branch, nil;
 }
 
 func (dep *BpmDependency) Scan() (error) {
@@ -144,7 +146,7 @@ func (dep *BpmDependency) Update() (error) {
     var err error;
     source := "";
     if UseLocal(dep.Url) {
-        source = path.Join(Options.UseLocalPath, dep.Name);
+        source = path.Join(Options.Local, dep.Name);
     } else {
         source = dep.Url;
         if source == "" {
@@ -173,6 +175,7 @@ func (dep *BpmDependency) Update() (error) {
         return nil;
     }
     git := &GitExec{Path: dep.Path}
+	// Clean all uncommitted changes
     err = git.Checkout(".");
     if err != nil {
         return bpmerror.New(err, "Error: There was an issue trying to remove all uncommited changes in " + dep.Path);
@@ -183,55 +186,47 @@ func (dep *BpmDependency) Update() (error) {
         return err;
     }
 
-    branch := "master";
-    pullRemote := Options.UseRemoteName;
+    pullRemote := Options.Remote;
+    // The local remote always has precedence.
     if git.RemoteExists("local") {
         pullRemote = "local"
-        branch, err := git.GetCurrentBranch();
+    }
+    git.LogOutput = true
+    err = git.Fetch(pullRemote)
+    if err != nil {
+        return err;
+    }
+	branch := Options.Branch;
+    if pullRemote == "local" {
+	    git.LogOutput = false;
+	    // The local branch always has precedence
+        branch, err = dep.SwitchBranches(source, dep.Path);
         if err != nil {
-            return bpmerror.New(err, "Error: Could not find the current branch in repository " + dep.Path);
+            return err;
         }
         if branch == "HEAD" {
             branch = "master"
         }
+        git.LogOutput = true;
+    } else {        
+    	// Switch back to the master branch if there is no local remote
+	    git.Checkout(branch);
     }
-
-    /*
-    if pullRemote == "local" {
-        err := git.Fetch(pullRemote)
-        if err != nil {
-            return err;
-        }
-        output, err = git.Run("git diff " + pullRemote + "/" + branch + " --shortstat")
-        if strings.TrimSpace(output) != "" {
-            UpdatePackageJsonVersion(source)
-        }
-    }
-    */
-
-    git.LogOutput = true
-
-    err = git.Pull(pullRemote, branch);
+    
+    git.LogOutput = true;
+	err = git.Merge(pullRemote, branch);
+    //err = git.Pull(pullRemote, branch);
     if err != nil {
         return err;
     }
-    git.LogOutput = false;
 
-    if UseLocal(source){
-        err = dep.SwitchBranches(source, dep.Path);
-        if err != nil {
-            return err;
-        }
-    }
-
-    git.LogOutput = true;
     _, err = git.Run("git submodule update --init --recursive")
     if err != nil {
         return err
     }
     git.LogOutput = false;
 
-    if UseLocal(source) {
+    if pullRemote == "local" {
         err = dep.CopyChanges(source, dep.Path);
         if err != nil {
             return err;
@@ -355,6 +350,17 @@ func (dep *BpmDependency) AddRemotes(source string, itemPath string) error {
     } else {
         gitDestination := GitExec{Path: itemPath};
         gitDestination.DeleteRemote("local");
+        gitDestination.DeleteRemote("origin");
+        
+        originUrl := source;
+	    if !strings.HasSuffix(originUrl, ".git") {
+	        originUrl = originUrl + ".git";
+	    }        
+        fmt.Println("Adding remote " + originUrl + " as origin to " + itemPath)
+        err = gitDestination.AddRemote("origin", originUrl)
+        if err != nil {
+            return bpmerror.New(err, "Error: There was an error adding the remote to the repository at " + itemPath)
+        }                
     }
     return nil
 }
@@ -398,7 +404,7 @@ func (dep *BpmDependency) Add() (error) {
     var err error;
     source := "";
     if UseLocal(dep.Url) {
-        source = path.Join(Options.UseLocalPath, dep.Name);
+        source = path.Join(Options.Local, dep.Name);
     } else {
         source = dep.Url;
         if source == "" {
@@ -441,7 +447,7 @@ func (dep *BpmDependency) Add() (error) {
         return err;
     }
 
-    err = git.Checkout("master")
+    err = git.Checkout(Options.Branch)
     if err != nil {
         return err;
     }
@@ -456,21 +462,17 @@ func (dep *BpmDependency) Add() (error) {
         if err != nil {
             return err;
         }
-
-        /*
-        output, err = git.Run("git diff local/master --shortstat")
-        if strings.TrimSpace(output) != "" {
-            UpdatePackageJsonVersion(source)
-        }
-        */
-
-        err = git.Pull("local", "master")
-        if err != nil {
-            return err;
-        }
-        err = dep.SwitchBranches(source, dep.Path);
+	    // The local branch always has precedence
+        branch, err := dep.SwitchBranches(source, dep.Path);
         if err != nil {
             return err
+        }
+        if branch == "HEAD" {
+	        branch = "master";
+        }
+        err = git.Merge("local", branch)
+        if err != nil {
+            return err;
         }
     }
     git.LogOutput = true;
