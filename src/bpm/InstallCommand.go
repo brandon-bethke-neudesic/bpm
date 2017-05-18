@@ -26,14 +26,11 @@ func (cmd *InstallCommand) Execute() (error) {
     if err != nil {
         return err;
     }
-
     if !bpm.HasDependencies() {
         fmt.Println("There are no dependencies")
         return nil;
     }
-
     name := cmd.Name;
-
     if name != "" && bpm.HasDependency(name){
         err = bpm.Dependencies[name].Install();
         if err != nil {
@@ -41,9 +38,12 @@ func (cmd *InstallCommand) Execute() (error) {
         }
     } else if name != "" {
         return errors.New("Error: There is no dependency named " + name)
-    } else {
-        fmt.Println("Installing all dependencies for " + Options.RootComponent);
+    } else {    	
+    	if len(bpm.Dependencies) > 0 {
+	        fmt.Println("Scanning " + Options.RootComponent);
+	   	}
         for _, item := range bpm.Dependencies {
+        	fmt.Println("Found " + item.Path);
             err = item.Install();
             if err != nil {
                 return err;

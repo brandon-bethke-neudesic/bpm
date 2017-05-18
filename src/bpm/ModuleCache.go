@@ -26,13 +26,13 @@ func (r *ModuleCache) Install() (error) {
 }
 
 func (r *ModuleCache) NpmInstall() (error){
-    fmt.Println("Npm is installing dependencies to node_modules...")
+    fmt.Println("Npm is installing dependencies for " + Options.RootComponent)
     workingPath,_ := os.Getwd();
     npm := NpmExec{Path: workingPath}
     // Go through each item in the bpm memory cache. There is suppose to only be one item per dependency
     for depName := range r.Items {
         depItem := r.Items[depName];
-        fmt.Println("Npm is installing " + depName + " to node_modules...")
+        fmt.Println("Npm is installing " + depName);
         // Perform the npm install and pass the url of the dependency. npm install ./bpm_modules/mydep
         err := npm.InstallUrl(depItem.Path)
         if err != nil {

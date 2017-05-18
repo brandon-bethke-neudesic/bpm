@@ -358,32 +358,31 @@ func (dep *BpmDependency) Install() (error) {
     newItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path, Version: pj.Version.String()}
     existingItem, exists := moduleCache.Items[dep.Name];
     if exists {
+    	fmt.Println(dep.Name + " is already cached. Comparing package.json versions...");
         existingVersion, _ := semver.Make(existingItem.Version)
         newVersion, _ := semver.Make(newItem.Version)
         if newVersion.GT(existingVersion) {
             moduleCache.Add(newItem)
-        } else {
-            fmt.Println("Version is not bigger")
         }
     } else {
         moduleCache.Add(newItem)
     }
-
+    fmt.Println(dep.Name + "@" + newItem.Version + " will be installed");
     bpm := BpmModules{}
-    fmt.Println("Loading modules for " + dep.Path)
     err := bpm.Load(path.Join(dep.Path, Options.BpmCachePath));
     if err != nil {
         return err;
     }
-
+	if len(bpm.Dependencies) > 0 {
+	    fmt.Println("Scanning " + dep.Path);
+	}
     for _, subdep := range bpm.Dependencies {
-        fmt.Println("Installing dependencies for " + subdep.Path)
+    	fmt.Println("Found " + subdep.Path);
         err = subdep.Install();
         if err != nil {
             return err;
         }
     }
-
     return nil;
 }
 
