@@ -43,8 +43,11 @@ func (cmd *UpdateCommand) Execute() (error) {
     } else if name != "" {
         return errors.New("Error: The item " + name + " has not been installed.")
     } else {
-        fmt.Println("Updating all dependencies for " + Options.RootComponent);
+    	if len(bpm.Dependencies) > 0 {
+	        fmt.Println("Scanning " + Options.RootComponent);
+	   	}    	
         for _, item := range bpm.Dependencies {
+        	fmt.Println("Found " + item.Name);
             err = item.Update();
             if err != nil {
                 return err;

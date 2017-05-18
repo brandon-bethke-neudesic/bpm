@@ -10,23 +10,13 @@ import (
     "net/url"
     "errors"
     "github.com/blang/semver"
+    "sort"
 )
 
 type BpmDependency struct {
     Name string
     Url string
     Path string
-}
-
-func (dep *BpmDependency) Equal(item *BpmDependency) bool {
-    // If the address is the same, then it's equal.
-    if dep == item {
-        return true;
-    }
-    if item.Url == dep.Url {
-        return true;
-    }
-    return false;
 }
 
 func (dep *BpmDependency) CopyChanges(source string, destination string) error {
@@ -50,15 +40,18 @@ func (dep *BpmDependency) CopyChanges(source string, destination string) error {
         fileDestination := path.Join(destination, file)
 
         fileInfo, err := os.Stat(fileSource)
+        if err != nil {
+	        return bpmerror.New(err, "Error: There was an error trying to get information about the changed file");
+        }
         if fileInfo.IsDir() {
-            os.MkdirAll(fileDestination, 0777)
+            os.MkdirAll(fileDestination, fileInfo.Mode())
             err = copyDir.Copy(fileSource, fileDestination);
             if err != nil {
                 return bpmerror.New(err, "Error: There was an error copying the changes from " + fileSource + " to " + fileDestination);
             }
         } else {
             parent, _ := filepath.Split(fileDestination)
-            os.MkdirAll(parent, 0777)
+            os.MkdirAll(parent, fileInfo.Mode())
             err = copyDir.CopyFile(fileSource, fileDestination);
             if err != nil {
                 return bpmerror.New(err, "Error: There was an error copying the changes from " + fileSource + " to " + fileDestination);
@@ -83,8 +76,6 @@ func (dep *BpmDependency) CopyChanges(source string, destination string) error {
             return err;
         }
     }
-
-
     return nil;
 }
 
@@ -118,7 +109,7 @@ func (dep *BpmDependency) Scan() (error) {
         moduleCache.Add(cacheItem);
     } else {
         if existingItem.Commit != itemCommit {
-            fmt.Println("Attempting to determine latest commit. " + existingItem.Commit + " or " + itemCommit)
+            fmt.Println(dep.Name + " is already cached. Attempting to determine latest commit. " + existingItem.Commit + " or " + itemCommit)
             git := GitExec{Path: dep.Path}
             result := git.DetermineLatest(itemCommit, existingItem.Commit)
             if result != existingItem.Commit {
@@ -131,20 +122,21 @@ func (dep *BpmDependency) Scan() (error) {
     }
 
     bpm := BpmModules{}
-    fmt.Println("Loading modules for", dep.Path)
     err = bpm.Load(path.Join(dep.Path, Options.BpmCachePath));
     if err != nil {
         return err;
     }
 
-    fmt.Println("Scanning dependencies for " + dep.Name)
+	if len(bpm.Dependencies) > 0 {
+        fmt.Println("Scanning " + dep.Path);
+   	}
     for _, subdep := range bpm.Dependencies {
+    	fmt.Println("Found " + subdep.Path); 
         err = subdep.Scan();
         if err != nil {
             return err;
         }
     }
-
     return nil;
 }
 
@@ -165,7 +157,7 @@ func (dep *BpmDependency) Update() (error) {
     }
     source = strings.Split(source, ".git")[0]
     _, itemName := filepath.Split(source)
-    fmt.Println("Processing item " + dep.Name)
+    fmt.Println("Updating " + dep.Name)
 
     if !PathExists(dep.Path) {
         err = dep.Add();
@@ -259,8 +251,11 @@ func (dep *BpmDependency) Update() (error) {
         return err;
     }
 
-    fmt.Println("Scanning dependencies for " + dep.Name)
+	if len(bpm.Dependencies) > 0 {
+	    fmt.Println("Scanning " + dep.Path)		
+	}
     for _, subdep := range bpm.Dependencies {
+    	fmt.Println("Found " + subdep.Path);
         if Options.Deep {
             err = subdep.Update();
         } else {
@@ -271,7 +266,6 @@ func (dep *BpmDependency) Update() (error) {
         }
     }
     UpdatePackageJsonVersion(".")
-
     return nil;
 }
 
@@ -287,7 +281,7 @@ func (dep *BpmDependency) AddRemotes(source string, itemPath string) error {
     if origin == nil {
         return errors.New("Error: The remote 'origin' is missing in this repository.")
     }
-
+    
     for _, remote := range remotes {
         // Always re-add the remotes
         if remote.Name != "local" && remote.Name != "origin" {
@@ -316,6 +310,20 @@ func (dep *BpmDependency) AddRemotes(source string, itemPath string) error {
             }
         }
     }
+    remotesModule, err := git.GetRemotes();
+    if err != nil {
+        return bpmerror.New(err, "Error: There was an error attempting to determine the remotes of " + itemPath)
+    }
+        
+    // Delete the remotes in the dependency that no longer are in the root repository
+	for _, remote := range remotesModule {
+		if remote.Name != "local" && remote.Name != "origin" {
+			i := sort.Search(len(remotes), func(i int) bool { return remotes[i].Name == remote.Name })						
+			if i >= len(remotes) {
+				git.DeleteRemote(remote.Name);
+			}			
+		}
+	}
 
     if UseLocal(source) {
         source = strings.Split(source, ".git")[0]
@@ -412,7 +420,7 @@ func (dep *BpmDependency) Add() (error) {
     cacheItem := &ModuleCacheItem{Name:dep.Name, Path: dep.Path}
     moduleCache.Add(cacheItem)
 
-    fmt.Println("Installing item " + dep.Name)
+    fmt.Println("Adding submodule " + dep.Name)
     cloneUrl := dep.Url;
     if cloneUrl == "" {
         cloneUrl = source;
@@ -487,15 +495,17 @@ func (dep *BpmDependency) Add() (error) {
     cacheItem.Commit = itemCommit;
 
     bpm := BpmModules{}
-    fmt.Println("Loading modules for " + dep.Path)
     err = bpm.Load(path.Join(dep.Path, Options.BpmCachePath));
     if err != nil {
         return err;
     }
     UpdatePackageJsonVersion(".")
 
+	if len(bpm.Dependencies) > 0 {
+	    fmt.Println("Scanning " + dep.Path)
+	}
     for _, subdep := range bpm.Dependencies {
-        fmt.Println("Scanning dependencies for " + subdep.Path)
+        fmt.Println("Found " + subdep.Path)
         err = subdep.Scan();
         if err != nil {
             return err;
