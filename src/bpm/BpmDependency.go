@@ -90,7 +90,7 @@ func (dep *BpmDependency) SwitchBranches(source string, destination string) (str
         return "", bpmerror.New(err, "Error: Could not find the current branch in the source repository");
     }
     if branch != "HEAD" {
-        fmt.Println("Source repository is on branch " + branch + ". Switching to branch " + branch);
+        fmt.Println("Source repository is on branch " + branch + ". Switching to branch " + branch + " in " + destination);
         err := gitDestination.Checkout(branch)
         if err != nil {
             return "", bpmerror.New(err, "Error: Could not switch to branch " + branch + " in the destination repository")
@@ -131,6 +131,8 @@ func (dep *BpmDependency) Scan() (error) {
 
 	if len(bpm.Dependencies) > 0 {
         fmt.Println("Scanning " + dep.Path);
+   	} else {
+	   	fmt.Println(dep.Path + " has no dependencies");
    	}
     for _, subdep := range bpm.Dependencies {
     	fmt.Println("Found " + subdep.Path); 
@@ -251,6 +253,8 @@ func (dep *BpmDependency) Update() (error) {
 
 	if len(bpm.Dependencies) > 0 {
 	    fmt.Println("Scanning " + dep.Path)		
+	} else {
+	   	fmt.Println(dep.Path + " has no dependencies");		
 	}
     for _, subdep := range bpm.Dependencies {
     	fmt.Println("Found " + subdep.Path);
@@ -392,6 +396,8 @@ func (dep *BpmDependency) Install() (error) {
     }
 	if len(bpm.Dependencies) > 0 {
 	    fmt.Println("Scanning " + dep.Path);
+	} else {
+	   	fmt.Println(dep.Path + " has no dependencies");		
 	}
     for _, subdep := range bpm.Dependencies {
     	fmt.Println("Found " + subdep.Path);
@@ -513,6 +519,8 @@ func (dep *BpmDependency) Add() (error) {
 
 	if len(bpm.Dependencies) > 0 {
 	    fmt.Println("Scanning " + dep.Path)
+	} else {
+	   	fmt.Println(dep.Path + " has no dependencies");
 	}
     for _, subdep := range bpm.Dependencies {
         fmt.Println("Found " + subdep.Path)

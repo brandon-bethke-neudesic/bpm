@@ -23,6 +23,11 @@ func (cmd *AddCommand) Initialize() (error) {
         return errors.New("Error: A url is required. Ex: bpm add ../myrepo.git");
     }
     cmd.Component = cmd.Args[0];
+    
+    if Options.Local != "" && Options.RemoteUrl != "" {
+    	return errors.New("Error: The --root option and --remoteurl option should not be used together.");
+    }
+    
     return nil;
 }
 
@@ -52,7 +57,6 @@ func (cmd *AddCommand) Execute() (error) {
     }
 
     if name != "" && bpm.HasDependency(name){
-
         return errors.New("Error: This component is already added")
     } else if name != "" {
         newItem := &BpmDependency{Name:name, Path: path.Join(Options.BpmCachePath, name), Url: cmd.Component}

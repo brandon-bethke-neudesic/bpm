@@ -33,13 +33,18 @@ Examples:
 	# Update the groupscale dependency and use the base url specified
 	bpm update groupscale --remoteurl https://neudesic.timu.com/projects/timu/code/brandon-bethke --skipnpm
 `
-	
+    	
 }
 
 func (cmd *UpdateCommand) Initialize() (error) {
     if len(cmd.Args) > 0 {
         cmd.Name = cmd.Args[0];
     }
+    
+    if Options.Local != "" && Options.RemoteUrl != "" {
+    	return errors.New("Error: The --root option and --remoteurl option should not be used together.");
+    }
+    
     return nil;
 }
 
