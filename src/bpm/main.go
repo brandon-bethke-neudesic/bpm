@@ -14,6 +14,7 @@ import (
 
 var moduleCache = ModuleCache{Items:make(map[string]*ModuleCacheItem)};
 var Options = BpmOptions {
+	PackageManager: "npm",
     BpmCachePath: "bpm_modules",
     ExcludeFileList: ".git|.gitignore|.gitmodules|bpm_modules|node_modules",
 }

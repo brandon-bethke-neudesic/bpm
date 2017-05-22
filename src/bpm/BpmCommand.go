@@ -14,7 +14,11 @@ type BpmCommand struct {
 
 func (cmd *BpmCommand) Description() string {
     return `
-The Better Package Manager
+The Better Package Manager for installing nodejs dependencies.
+BPM helps keeps local development copies of nodejs dependencies updated in node_modules. Amazing!
+
+Dependencies are expected to be git submodules located in the ./bpm_modules folder
+
 `
 }
 

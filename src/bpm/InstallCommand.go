@@ -23,11 +23,19 @@ func (cmd *InstallCommand) Initialize() (error) {
 func (cmd *InstallCommand) Description() (string){
 	return `
 	
-Run npm install on each dependency in the hierarchy.
+Run npm install on each dependency in the hierarchy. The install command will not first perform an update.
+
+If there is a situation where the same dependency is being installed multiple times, the version number in package.json 
+will be compared and the higher version will be installed.
+
+Examples:
+
+	bpm install
+	bpm install bpmdep1
 `
 }
 
-func (cmd *InstallCommand) Execute() (error) {
+func (cmd *InstallCommand) Execute() (error) {	
     bpm := BpmModules{}
     err := bpm.Load(Options.BpmCachePath);
     if err != nil {
@@ -38,17 +46,18 @@ func (cmd *InstallCommand) Execute() (error) {
         return nil;
     }
     name := cmd.Name;
-    if name != "" && bpm.HasDependency(name){
-        err = bpm.Dependencies[name].Install();
-        if err != nil {
-            return err;
-        }
-    } else if name != "" {
-        return errors.New("Error: There is no dependency named " + name)
+	// Check if updating a single depedency, otherwise update all of them.
+    if name != "" {	
+    	if bpm.HasDependency(name) {
+	        err = bpm.Dependencies[name].Install();
+	        if err != nil {
+	            return err;
+	        }
+    	} else {
+	        return errors.New("Error: The dependency " + name + " has not been installed or is not a direct dependency.")    	
+    	}
     } else {    	
-    	if len(bpm.Dependencies) > 0 {
-	        fmt.Println("Scanning " + Options.RootComponent);
-	   	}
+        fmt.Println("Scanning " + Options.RootComponent);
         for _, item := range bpm.Dependencies {
         	fmt.Println("Found " + item.Path);
             err = item.Install();
@@ -69,7 +78,7 @@ func NewInstallCommand() *cobra.Command {
     myCmd := &InstallCommand{}
     cmd := &cobra.Command{
         Use:   "install [NAME]",
-        Short: "install the specified component",
+        Short: "install the specified dependency",
         Long:  myCmd.Description(),
         PreRunE: func(cmd *cobra.Command, args []string) error {
             myCmd.Args = args;
@@ -85,8 +94,8 @@ func NewInstallCommand() *cobra.Command {
         },
     }
 
-	flags := cmd.Flags();    
-    flags.StringVar(&Options.PackageManager, "pkgm", "npm", "Use the specified package manager to install the component. npm or yarn")
+	//flags := cmd.Flags();    
+    //flags.StringVar(&Options.PackageManager, "pkgm", "npm", "Use the specified package manager to install the component. npm or yarn")
 
     return cmd
 }

@@ -9,6 +9,7 @@ import (
     "path"
     "time"
     "strconv"
+    "os"
 )
 
 type PackageJson struct {
@@ -36,7 +37,7 @@ func (pj *PackageJson) Load() error {
     }
     err = json.Unmarshal(dat, &pj.raw);
     if err != nil {
-        return err;
+    	return bpmerror.New(err, "Error: Could not read the json data in " + pj.Path);
     }
 
     version, _ := pj.raw["version"].(string);
@@ -54,10 +55,14 @@ func (pj *PackageJson) Save() error {
     enc.SetEscapeHTML(false)
     enc.SetIndent("", "    ");
     _ = enc.Encode(pj.raw)
-    file := path.Join(pj.Path, "package.json");
-    err := ioutil.WriteFile(file, buf.Bytes(), 0666);
+    filename := path.Join(pj.Path, "package.json");
+    file, err := os.Stat(filename);
     if err != nil {
-        return bpmerror.New(err, "Error: There was an issue writing the file " + file)
+    	return bpmerror.New(err, "Error: Could not get file information for " + filename);
+    }
+    err = ioutil.WriteFile(filename, buf.Bytes(), file.Mode());
+    if err != nil {
+        return bpmerror.New(err, "Error: There was an issue writing the file " + filename)
     }
 
     return nil;

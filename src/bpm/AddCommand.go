@@ -18,6 +18,12 @@ type AddCommand struct {
     Name string
 }
 
+func (cmd *AddCommand) Description() (string) {
+	return `
+Add the specified item as a dependency. Add does not perform an install.
+`	
+}
+
 func (cmd *AddCommand) Initialize() (error) {
     if len(cmd.Args) == 0 {
         return errors.New("Error: A url is required. Ex: bpm add ../myrepo.git");
@@ -69,8 +75,8 @@ func NewAddCommand() *cobra.Command {
     myCmd := &AddCommand{}
     cmd := &cobra.Command{
         Use:   "add [URL]",
-        Short: "add the specified item as a dependency",
-        Long:  "add the specified item as a dependency",
+        Short: "Add the specified item as a dependency",
+        Long:  myCmd.Description(),
         PreRunE: func(cmd *cobra.Command, args []string) error {
             myCmd.Args = args;
             return myCmd.Initialize();

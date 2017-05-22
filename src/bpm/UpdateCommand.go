@@ -16,7 +16,38 @@ type UpdateCommand struct {
 func (cmd *UpdateCommand) Description() (string) {
     return `
     
-Update a dependency then run npm install.
+Update a dependency in bpm_modules then run npm install. Updating means to fetch and merge changes from origin/master unless otherwise specified.
+Only direct dependencies are updated. Dependencies of dependencies are not updated.
+
+When updating, all changes in tracked files in the dependency will be discarded.
+
+Option --root
+	
+	The root option tells bpm to add a local remote to the dependency for the specified relative location and then fetch the changes from the local remote.
+	The local remote url will be the current working directory plus the specified location plus the name of the dependency. 
+	Ex: bpm update bpmdep1 --root=..
+	The local remote url in this case would be CWD/../bpmdep1
+		
+	Any committed changes will be fetched and merged.
+	Any staged or untracked changes will be copied.
+	If the local remote is on a branch, then the dependency will also be switched to use this branch.
+		
+Option --remote
+
+	The remote option instructs bpm to use specified remote when fetching changes rather than the default origin.
+	This option is not to be used with --root since they are mutually exclusive.
+	
+Option --branch
+
+	The branch option instructs bpm to use the specified branch when merging changes rather than default master.
+	This option is not to be used with --root since the branch the local remote is on always has precedence.
+		
+Versioning
+
+	The version number in package.json will always be updated and will be modified with a build number. Ex: 0.0.1-1495480065
+	Where 1495480065 represents the number of seconds since Jan 1st 1970 UTC.
+
+	When using the --root option and when copying changes, if any, from a local dependency repository, then the package.json version number in that dependenecy will also be updated.
 
 Examples:
 
@@ -62,17 +93,18 @@ func (cmd *UpdateCommand) Execute() (error) {
 
     name := cmd.Name;
 
-    if name != "" && bpm.HasDependency(name){
-        err = bpm.Dependencies[name].Update();
-        if err != nil {
-            return err;
-        }
-    } else if name != "" {
-        return errors.New("Error: The item " + name + " has not been installed.")
+	// Check if updating a single depedency, otherwise update all of them.
+    if name != "" {
+    	if bpm.HasDependency(name){
+	        err = bpm.Dependencies[name].Update();
+	        if err != nil {
+	            return err;
+	        }
+    	} else {
+	        return errors.New("Error: The dependency " + name + " has not been installed or is not a direct dependency.")    		
+    	}
     } else {
-    	if len(bpm.Dependencies) > 0 {
-	        fmt.Println("Scanning " + Options.RootComponent);
-	   	}    	
+        fmt.Println("Scanning " + Options.RootComponent);
         for _, item := range bpm.Dependencies {
         	fmt.Println("Found " + item.Name);
             err = item.Update();
@@ -96,7 +128,7 @@ func NewUpdateCommand() *cobra.Command {
     myCmd := &UpdateCommand{}
     cmd := &cobra.Command{
         Use:   "update [NAME]",
-        Short: "update the specified component",
+        Short: "update the specified dependency",
         Long:  myCmd.Description(),
         PreRunE: func(cmd *cobra.Command, args []string) error {
             myCmd.Args = args;
