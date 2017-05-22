@@ -184,10 +184,16 @@ func (dep *BpmDependency) Update() (error) {
     }
 
     pullRemote := Options.Remote;
-    // The local remote always has precedence.
-    if git.RemoteExists("local") {
-        pullRemote = "local"
+    // Local remote always has precedence.
+    localRemote := git.GetRemote("local");
+    if localRemote != nil {
+    	if PathExists(localRemote.Url) {
+	    	pullRemote = "local";
+    	} else if !Options.IgnoreMissingLocal {
+	    	return errors.New("Error: A remote named 'local' exists, but the path does not exist. " + localRemote.Url);
+    	}
     }
+
     git.LogOutput = true
     err = git.Fetch(pullRemote)
     if err != nil {
@@ -454,7 +460,12 @@ func (dep *BpmDependency) Add() (error) {
         return err;
     }
 
-    if UseLocal(source) {
+    // Local remote always has precedence.
+    localRemote := git.GetRemote("local");
+    if localRemote != nil {
+    	if !PathExists(localRemote.Url) {
+	    	return errors.New("Error: A remote named 'local' exists, but the path does not exist. " + localRemote.Url);    		
+    	}    	
         err := git.Fetch("local")
         if err != nil {
             return err;
@@ -479,7 +490,7 @@ func (dep *BpmDependency) Add() (error) {
     }
     git.LogOutput = false;
 
-    if UseLocal(source){
+    if localRemote != nil {
         err = dep.CopyChanges(source, dep.Path);
         if err != nil {
             return err;

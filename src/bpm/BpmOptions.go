@@ -19,6 +19,7 @@ type BpmOptions struct {
     PackageManager string
     WorkingDir string
     Branch string
+    IgnoreMissingLocal bool
 }
 
 func (options *BpmOptions) EnsureBpmCacheFolder() {
