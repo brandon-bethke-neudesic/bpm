@@ -162,10 +162,7 @@ func (dep *BpmDependency) Update() (error) {
     fmt.Println("Updating " + dep.Name)
 
     if !PathExists(dep.Path) {
-        err = dep.Add();
-        if err != nil {
-            return err;
-        }
+    	return errors.New("Error: The dependency does not exist. You must first add it. Ex: bpm add ../" + dep.Name + ".git");
     }
 
     // If the item is cached then it is already updated and there is no reason to update it again.
