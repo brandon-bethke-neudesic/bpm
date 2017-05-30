@@ -4,8 +4,9 @@ package main;
 import  (
     "os/exec"
     "fmt"
-    "bufio"
     "bytes"
+    "io"
+    "os"
 )
 
 type OsExec struct {
@@ -20,41 +21,18 @@ func (rc *OsExec) Run(command string) (string, error) {
     cmd := exec.Command("sh", "-c", command);
     cmd.Dir = rc.Dir;
 
-    stdOutDone := make(chan bool);
-    stdErrDone := make(chan bool);
-
     var buffer bytes.Buffer
-    stdout, err := cmd.StdoutPipe();
-    stderr, err := cmd.StderrPipe();
-    scannerOut := bufio.NewScanner(stdout)
-    go func() {
-        for scannerOut.Scan() {
-            text := scannerOut.Text();
-            if rc.LogOutput {
-                fmt.Println(text)
-            }
-            buffer.WriteString(fmt.Sprintf("%s\n", text))
-        }
-        stdOutDone <- true;
-    }()
-
-    scannerErr := bufio.NewScanner(stderr)
-    go func() {
-        for scannerErr.Scan() {
-            text := scannerErr.Text();
-            if rc.LogOutput {
-                fmt.Println(text)
-            }
-            buffer.WriteString(fmt.Sprintf("%s\n", text))
-        }
-        stdErrDone <- true;
-    }()
-
-    err = cmd.Start();
-    if err == nil {
-        err = cmd.Wait();
+    var w io.Writer;
+	if rc.LogOutput {
+		w = io.MultiWriter(os.Stdout, &buffer)
+	} else {
+		w = io.Writer(&buffer);
+	}
+	cmd.Stdout = w;
+	cmd.Stderr = w;
+    err := cmd.Run();
+    if err != nil {
+		return "", err;
     }
-    <-stdOutDone
-    <-stdErrDone
     return buffer.String(), err;
 }
