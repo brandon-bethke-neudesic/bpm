@@ -55,7 +55,7 @@ func (options *BpmOptions) GetBoolOption(args []string, name string) (bool) {
 
 func (options *BpmOptions) GetRootOption(args []string) string{
     root := options.GetNameValueOption(args, "--root=", "")
-    if strings.Index(root, ".") == 0 || strings.Index(root, "..") == 0 {
+    if strings.HasPrefix(root, "./") || strings.HasPrefix(root, "../") {
         root = path.Join(options.WorkingDir, root)
     }
     return root

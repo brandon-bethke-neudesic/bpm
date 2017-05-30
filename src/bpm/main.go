@@ -74,7 +74,9 @@ func MakeRemoteUrl(itemUrl string) (string, error) {
                 return "", errors.New("Error: There was a problem getting the remote url " + Options.Remote)
             }
             remoteUrl = remote.Url;
-            relative = "..";
+            if !strings.HasPrefix(adjustedUrl, "./") && !strings.HasPrefix(adjustedUrl, "../"){
+	            relative = "..";
+            }
         }
         parsedUrl, err := url.Parse(remoteUrl)
         if err != nil {
